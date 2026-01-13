@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Big D's Tree Service Janesville WI | Tree Removal, Pruning & Storm Cleanup</title>
+    <meta name="description"
+        content="Safe, efficient tree service near me in Janesville, WI. Precision removal, pruning, and emergency response for Rock County homes. Every cut counts—get started today.">
+
+    <!-- Preload Critical Image (Assuming Winter for now due to date) -->
+    <link rel="preload" as="image" href="assets/images/hero-winter.png" fetchpriority="high">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Outfit:wght@600;700&display=swap"
+        rel="stylesheet">
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="styles.css">
+
+    <!-- Schema -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "TreeService",
+      "name": "Big D's Tree Service",
+      "founder": "Corey Dean",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "Janesville Area",
+        "addressLocality": "Janesville",
+        "addressRegion": "WI",
+        "postalCode": "53545",
+        "addressCountry": "US"
+      },
+      "telephone": "(262) 215-0497",
+      "email": "Bigdstrees33@gmail.com",
+      "priceRange": "$$",
+      "geo": {
+        "@type": "GeoCoordinates",
+        "latitude": 42.6828,
+        "longitude": -89.0187
+      },
+      "areaServed": ["Janesville", "Rock County", "Walworth", "Jefferson", "Dane", "Racine"],
+      "sameAs": [
+        "https://www.facebook.com/BigDsTreeService"
+      ]
+    }
+    </script>
+</head>
+
+<body>
+
+    <!-- Hero Section -->
+    <header class="hero" id="hero">
+        <!-- Background Layer -->
+        <div class="hero-bg">
+            <img src="assets/images/hero-spring.png" alt="Big D's Tree Service Janesville - Historic home in Spring"
+                class="hero-img spring" loading="lazy">
+            <img src="assets/images/hero-summer.png" alt="Big D's Tree Service Janesville - Historic home in Summer"
+                class="hero-img summer" loading="lazy">
+            <img src="assets/images/hero-fall.png" alt="Big D's Tree Service Janesville - Historic home in Fall"
+                class="hero-img fall" loading="lazy">
+            <img src="assets/images/hero-winter.png" alt="Big D's Tree Service Janesville - Historic home in Winter"
+                class="hero-img winter active" fetchpriority="high">
+            <img src="assets/images/hero-night.png" alt="Big D's Tree Service Janesville - Historic home at Night"
+                class="hero-img night" loading="lazy">
+        </div>
+
+        <!-- Overlay -->
+        <div class="hero-content">
+            <h1 class="hero-title">Your Home. Protected.</h1>
+            <p class="hero-sub">Through every season. Every cut counts.</p>
+
+            <form class="hero-form" onsubmit="event.preventDefault(); handleHeroSubmit();">
+                <div class="input-group">
+                    <input type="text" id="concernInput"
+                        placeholder="Tell us about your tree—leaning branch? Storm concern?"
+                        aria-label="Describe your tree concern" required>
+                    <button type="submit" class="btn-primary">Get Started</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Response Modal (Hidden initially) -->
+        <div class="hero-response" id="heroResponse">
+            <div class="response-wrapper">
+                <div class="response-card">
+                    <button class="close-modal" aria-label="Close" onclick="closeHeroResponse()">&times;</button>
+                    <p id="responseText" class="response-text"></p>
+                    <form class="intake-form">
+                        <input type="text" placeholder="Your Name" required>
+                        <input type="tel" placeholder="Phone Number" required>
+                        <select aria-label="Preferred Time">
+                            <option value="" disabled selected>Preferred Time</option>
+                            <option value="morning">Morning</option>
+                            <option value="afternoon">Afternoon</option>
+                        </select>
+                        <button type="submit" class="btn-primary">Confirm Request</button>
+                    </form>
+                </div>
+
+                <!-- Trust Reviews (Translucent) -->
+                <div class="trust-reviews">
+                    <div class="review-pill">
+                        <span class="stars">★★★★★</span>
+                        <span class="review-text">"Big D's saved our oak after the storm."</span>
+                    </div>
+                    <div class="review-pill">
+                        <span class="stars">★★★★★</span>
+                        <span class="review-text">"Professional, clean, and fast."</span>
+                    </div>
+                    <div class="review-pill">
+                        <span class="stars">★★★★★</span>
+                        <span class="review-text">"Corey truly cares about the trees."</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main>
+        <!-- Dream Realized -->
+        <section class="section dream" id="dream">
+            <div class="container fade-in">
+                <h2 class="section-title">The Dream Realized</h2>
+                <p class="poetic-text">See your home transformed. Trees that shelter, not shadow. Family moments under
+                    safe canopies. Legacy preserved.</p>
+            </div>
+        </section>
+
+        <!-- Services -->
+        <section class="section services">
+            <div class="container grid-3">
+                <div class="service-card fade-in delay-1">
+                    <h3>Health</h3>
+                    <p>Pruning for longevity. Trees grow stronger, healthier.</p>
+                </div>
+                <div class="service-card fade-in delay-2">
+                    <h3>Safety</h3>
+                    <p>Removal and storm response. Hazards gone, peace restored.</p>
+                </div>
+                <div class="service-card fade-in delay-3">
+                    <h3>Beauty</h3>
+                    <p>Shaping and cleanup. Your landscape alive, inviting.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Trust -->
+        <section class="section trust">
+            <div class="container center-text fade-in">
+                <blockquote class="testimonial">"Fast storm response—saved our yard!" <span class="stars">★★★★★</span>
+                </blockquote>
+                <p class="trust-badge">Fully Insured & Family Owned</p>
+                <p>We've guarded Janesville homes for years. Every cut precise.</p>
+            </div>
+        </section>
+
+        <!-- About -->
+        <section class="section about">
+            <div class="container fade-in">
+                <h2>About Us</h2>
+                <p>Big D's Tree Service. Family-owned in Janesville. Corey Dean leads with local roots and precision.
+                    Our tree-for-tree commitment: Plant one for every removal. Every cut counts—for you, for Wisconsin.
+                </p>
+            </div>
+        </section>
+
+        <!-- Gallery -->
+        <section class="section gallery">
+            <div class="container grid-gallery">
+                <!-- Placeholders for gallery - in real usage these would be file paths -->
+                <div class="gallery-item"></div>
+                <div class="gallery-item"></div>
+                <div class="gallery-item"></div>
+                <div class="gallery-item"></div>
+            </div>
+        </section>
+
+        <!-- Close / CTA -->
+        <section class="section close">
+            <div class="container center-text">
+                <h2>Ready to protect what matters?</h2>
+                <a href="tel:2622150497" class="btn-large">Call (262) 215-0497</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <p class="nap">Big D's Tree Service, Janesville, WI 53545 | (262) 215-0497 | Bigdstrees33@gmail.com</p>
+            <p class="areas">Serving Janesville, Rock County, Walworth, Jefferson, Dane, Racine</p>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
