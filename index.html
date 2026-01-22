@@ -36,7 +36,7 @@
         "addressCountry": "US"
       },
       "telephone": "(262) 215-0497",
-      "email": "Bigdstrees33@gmail.com",
+      "email": "shipithon@gmail.com",
       "priceRange": "$$",
       "geo": {
         "@type": "GeoCoordinates",
@@ -84,42 +84,63 @@
             </form>
         </div>
 
-        <!-- Response Modal (Hidden initially) -->
+        <!-- Chat Modal (Hidden initially) -->
         <div class="hero-response" id="heroResponse">
-            <div class="response-wrapper">
-                <div class="response-card">
-                    <button class="close-modal" aria-label="Close" onclick="closeHeroResponse()">&times;</button>
-                    <p id="responseText" class="response-text"></p>
-                    <form class="intake-form">
-                        <input type="text" placeholder="Your Name" required>
-                        <input type="tel" placeholder="Phone Number" required>
-                        <select aria-label="Preferred Time">
-                            <option value="" disabled selected>Preferred Time</option>
-                            <option value="morning">Morning</option>
-                            <option value="afternoon">Afternoon</option>
-                        </select>
-                        <button type="submit" class="btn-primary">Confirm Request</button>
-                    </form>
-                </div>
+            <div class="response-wrapper chat-wrapper">
+                <div class="chat-container">
+                    <div class="chat-header">
+                        <div class="chat-title">
+                            <span class="chat-icon">🌳</span>
+                            <span>Big D's Smart Desk</span>
+                        </div>
+                        <button class="close-modal" aria-label="Close" onclick="closeChat()">&times;</button>
+                    </div>
 
-                <!-- Trust Reviews (Translucent) -->
-                <div class="trust-reviews">
-                    <div class="review-pill">
-                        <span class="stars">★★★★★</span>
-                        <span class="review-text">"Big D's saved our oak after the storm."</span>
+                    <!-- Chat Messages Area -->
+                    <div class="chat-messages" id="chatMessages">
+                        <!-- Messages will be injected here -->
                     </div>
-                    <div class="review-pill">
-                        <span class="stars">★★★★★</span>
-                        <span class="review-text">"Professional, clean, and fast."</span>
+
+                    <!-- Photo Upload Section (hidden until ready) -->
+                    <div class="photo-section hidden" id="photoSection">
+                        <div class="photo-tips">
+                            <span class="tip">📍 Full tree</span>
+                            <span class="tip">🌳 Base/trunk</span>
+                            <span class="tip">⚡ Power lines</span>
+                        </div>
+                        <div class="photo-upload-area" id="drop-zone">
+                            <div class="upload-icon">📷</div>
+                            <p>Tap to add photos</p>
+                            <input type="file" id="photo-input" multiple accept="image/*" hidden>
+                            <div class="preview-grid" id="photo-previews"></div>
+                        </div>
+                        <button class="btn-primary" onclick="submitWithPhotos()">Submit Request</button>
                     </div>
-                    <div class="review-pill">
-                        <span class="stars">★★★★★</span>
-                        <span class="review-text">"Corey truly cares about the trees."</span>
+
+                    <!-- Result Section (hidden until complete) -->
+                    <div class="result-section hidden" id="resultSection">
+                        <div id="result-content"></div>
+                        <button class="btn-primary" onclick="closeChat()">Done</button>
+                    </div>
+
+                    <!-- Chat Input -->
+                    <div class="chat-input-area" id="chatInputArea">
+                        <input type="text" id="chatInput" placeholder="Type your response..."
+                            onkeypress="if(event.key==='Enter')sendUserMessage()">
+                        <button class="send-btn" onclick="sendUserMessage()">
+                            <span>Send</span>
+                        </button>
                     </div>
                 </div>
             </div>
         </div>
     </header>
+
+    <!-- Settings Button (Footer) -->
+
+
+    <!-- Settings Modal -->
+
 
     <!-- Main Content -->
     <main>
@@ -192,12 +213,13 @@
 
     <footer class="footer">
         <div class="container">
-            <p class="nap">Big D's Tree Service, Janesville, WI 53545 | (262) 215-0497 | Bigdstrees33@gmail.com</p>
+            <p class="nap">Big D's Tree Service, Janesville, WI 53545 | (262) 215-0497 | shipithon@gmail.com</p>
             <p class="areas">Serving Janesville, Rock County, Walworth, Jefferson, Dane, Racine</p>
         </div>
     </footer>
 
-    <script src="script.js"></script>
+    <script src="env.js"></script>
+    <script type="module" src="frontend/script.js"></script>
 </body>
 
 </html>

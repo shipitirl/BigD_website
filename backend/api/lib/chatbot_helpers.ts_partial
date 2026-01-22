@@ -1,0 +1,112 @@
+
+// ----------------------
+// READINESS CHECKERS
+// ----------------------
+function isReadyForPhotos(state: SessionState): boolean {
+  // Ready for photos when we have:
+  // 1. Job info (service type, zip, tree count)
+  // 2. Basic details (power lines, access asked)
+  // 3. Contact info (phone required for finalize)
+  return !!(
+    state.zip &&
+    state.serviceType &&
+    state.serviceType !== "unknown" &&
+    state.treeCount !== undefined &&
+    (state.hasPowerLines !== undefined || state.questions_asked?.includes('power_lines')) &&
+    (state.access !== undefined || state.questions_asked?.includes('access')) &&
+    (state.location !== undefined || state.questions_asked?.includes('location')) &&
+    state.contact?.phone  // Contact required before photos
+  );
+}
+
+function isReadyForEstimate(state: SessionState): boolean {
+  return isReadyForPhotos(state) && state.hasPhotos === true;
+}
+
+// ----------------------
+// ESTIMATE CALCULATOR
+// ----------------------
+export function calculateEstimate(state: SessionState): Estimate {
+  const drivers: string[] = [];
+  let baseMin = 200;
+  let baseMax = 400;
+
+  // Service type pricing
+  switch (state.serviceType) {
+    case "tree_removal":
+      baseMin = 500;
+      baseMax = 1500;
+      drivers.push("Tree removal");
+      break;
+    case "stump_grinding":
+      baseMin = 100;
+      baseMax = 400;
+      drivers.push("Stump grinding");
+      break;
+    case "trimming":
+      baseMin = 200;
+      baseMax = 800;
+      drivers.push("Trimming/pruning");
+      break;
+    case "storm_cleanup":
+      baseMin = 300;
+      baseMax = 1200;
+      drivers.push("Storm cleanup");
+      break;
+  }
+
+  // Tree count multiplier
+  const count = state.treeCount || 1;
+  if (count > 1) {
+    baseMin *= count * 0.8; // Slight discount for multiple
+    baseMax *= count * 0.9;
+    drivers.push(`${count} trees/stumps`);
+  }
+
+  // Access difficulty
+  if (state.access === "hard") {
+    baseMin *= 1.3;
+    baseMax *= 1.4;
+    drivers.push("Difficult access (+30-40%)");
+  } else if (state.access === "medium") {
+    baseMin *= 1.1;
+    baseMax *= 1.15;
+    drivers.push("Gate/fence access (+10-15%)");
+  }
+
+  // Power lines
+  if (state.hasPowerLines) {
+    baseMin *= 1.2;
+    baseMax *= 1.3;
+    drivers.push("Near power lines (+20-30%)");
+  }
+
+  // Haul away
+  if (state.haulAway === true) {
+    baseMin += 100;
+    baseMax += 200;
+    drivers.push("Debris removal (+$100-200)");
+  }
+
+  // Emergency surcharge
+  if (state.urgency === "emergency") {
+    baseMin *= 1.5;
+    baseMax *= 1.5;
+    drivers.push("Emergency service (+50%)");
+  }
+
+  // Confidence based on info completeness
+  let confidence: "high" | "medium" | "low" = "low";
+  if (state.hasPhotos && state.treeCount && state.access) {
+    confidence = "high";
+  } else if (state.zip && state.serviceType !== "unknown") {
+    confidence = "medium";
+  }
+
+  return {
+    min: Math.round(baseMin),
+    max: Math.round(baseMax),
+    confidence,
+    drivers,
+  };
+}

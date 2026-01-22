@@ -1,0 +1,30 @@
+# Build
+.next/
+backend/.next/
+dist/
+build/
+
+# Runtime Data
+.sessions/
+backend/.sessions/
+*.log
+frontend-*.log
+
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Environment
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.DS_Store
+
+# Misc
+.idea/
+.vscode/
+*.swp
+env.js
