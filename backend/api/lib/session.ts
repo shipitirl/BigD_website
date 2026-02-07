@@ -35,7 +35,7 @@ export type ServiceType =
   | 'work_planning'
   | 'tree_preservation'
   | 'other';
-export type SessionStatus = 'collecting' | 'awaiting_photos' | 'ready_for_estimate' | 'awaiting_owner' | 'approved' | 'scheduled';
+export type SessionStatus = 'collecting' | 'awaiting_photos' | 'ready_for_estimate' | 'awaiting_owner' | 'approved' | 'scheduled' | 'completed' | 'lost';
 export type AccessLocation = 'front_yard' | 'backyard';
 export type SlopeType = 'easy' | 'moderate' | 'steep';
 export type UrgencyType = 'normal' | 'urgent' | 'emergency';
@@ -60,6 +60,8 @@ export interface Contact {
   name: string | null;
   phone: string | null;
   email: string | null;
+  address: string | null;
+  city: string | null;
 }
 
 export interface Photos {
@@ -105,6 +107,15 @@ export interface SessionState {
 
   // Questions tracking - prevents repeating questions
   questions_asked: string[];
+
+  // CRM tracking (optional - populated after finalization)
+  hubspot_deal_id?: string;
+  hubspot_contact_id?: string;
+
+  // Outcome tracking (populated when deal closes)
+  actual_amount?: number;
+  lost_reason?: string;
+  completed_at?: string;
 }
 
 // ----------------------
@@ -126,7 +137,7 @@ export function createSession(): SessionState {
     urgency: 'normal',
 
     zip: null,
-    contact: { name: null, phone: null, email: null },
+    contact: { name: null, phone: null, email: null, address: null, city: null },
 
     photos: { urls: [], count: 0 },
     photos_uploaded: false,
@@ -186,8 +197,8 @@ export function getMissingFields(state: SessionState): string[] {
   // P1: zip
   if (!state.zip) missing.push('zip');
 
-  // P2: tree_count
-  if (!state.tree_count) missing.push('tree_count');
+  // P2: tree_count (use === null to allow 0 as a valid value)
+  if (state.tree_count === null) missing.push('tree_count');
 
   // P3: haul_debris
   if (state.haul_away === null) missing.push('haul_debris');
@@ -209,17 +220,27 @@ export function getMissingFields(state: SessionState): string[] {
   // P8: structures
   if (state.hazards.structures_nearby === null) missing.push('structures');
 
-  // P10-11: contact info (only asked after photos - handled by question condition)
+  // P10: Contact Info (Must be collected BEFORE photos now)
   if (!state.contact.name) missing.push('contact_name');
   if (!state.contact.phone) missing.push('contact_phone');
+  if (!state.contact.email) missing.push('contact_email');
+  if (!state.contact.address) missing.push('contact_address');
+  if (!state.contact.city) missing.push('contact_city');
 
   return missing;
 }
 
 export function isReadyForEstimate(state: SessionState): boolean {
-  // Need: service_type (auto-detected), tree_count, zip
-  // Contact is collected AFTER estimate
-  return state.service_type !== null && state.tree_count !== null && state.zip !== null;
+  // Need: service_type, zip, tree_count
+  // Contact info is now required earlier in the flow, so we check that too.
+  return state.service_type !== null && 
+         state.tree_count !== null && 
+         state.zip !== null && 
+         !!state.contact.name && 
+         !!state.contact.phone && 
+         !!state.contact.email &&
+         !!state.contact.address &&
+         !!state.contact.city;
 }
 
 // ----------------------

@@ -4,10 +4,11 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { getSession, saveSession, SessionState } from '@/api/lib/session';
+import { SessionState } from '@/api/lib/session';
 import { sendBookingConfirmation } from '@/api/lib/sms';
 import { withIdempotency, wasSmsProcessed } from '@/api/lib/idempotency';
 import { logger } from '@/api/lib/logger';
+import { findSessionByPhone, saveSession } from '@/api/lib/utils';
 
 // ----------------------
 // CONFIG
@@ -98,11 +99,7 @@ function optOut(phone: string): void {
 // ----------------------
 // FIND SESSION BY PHONE
 // ----------------------
-// In production, this should query the database
-function findSessionByPhone(phone: string): SessionState | null {
-  // Placeholder - in production, query DB
-  return null;
-}
+// (Uses persistent storage via utils.ts)
 
 // ----------------------
 // TwiML RESPONSE HELPER
@@ -193,14 +190,14 @@ export async function POST(request: NextRequest) {
           );
           
           // Find and update session status
-          const session = findSessionByPhone(phone);
+          const session = await findSessionByPhone(phone);
           if (session) {
             // Prevent double-scheduling
             if (session.status === 'scheduled') {
               return { alreadyScheduled: true };
             }
             session.status = 'scheduled';
-            saveSession(session);
+            await saveSession(session.lead_id, session);
           }
           
           return { success: true };
@@ -219,11 +216,11 @@ export async function POST(request: NextRequest) {
       logger.smsReceived(leadId, from, 'NO - declined');
       
       // Find and update session for follow-up
-      const session = findSessionByPhone(phone);
+      const session = await findSessionByPhone(phone);
       if (session) {
         (session as any).declined = true;
         (session as any).declinedAt = new Date().toISOString();
-        saveSession(session);
+        await saveSession(session.lead_id, session);
       }
       
       return twimlResponse("No problem! Corey will call you to discuss. If you have questions, call us at (262) 215-0497.");

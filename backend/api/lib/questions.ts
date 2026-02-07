@@ -106,6 +106,28 @@ export const QUESTION_LIBRARY: Question[] = [
     type: 'phone',
     // Contact info is collected after job questions, before photo upload
   },
+  {
+    id: 'contact_email',
+    priority: 12,
+    text: "What's your email address for the estimate?",
+    field: 'contact.email',
+    type: 'text',
+    // Contact info is collected after job questions, before photo upload
+  },
+  {
+    id: 'contact_address',
+    priority: 13,
+    text: "What's the street address for the job?",
+    field: 'contact.address',
+    type: 'text',
+  },
+  {
+    id: 'contact_city',
+    priority: 14,
+    text: "And what city is the job in?",
+    field: 'contact.city',
+    type: 'text',
+  },
 ];
 
 // ----------------------
@@ -134,6 +156,9 @@ export function getNextQuestion(state: SessionState): Question | null {
     'structures': 'structures',
     'contact_phone': 'contact_phone',
     'contact_name': 'contact_name',
+    'contact_email': 'contact_email',
+    'contact_address': 'contact_address',
+    'contact_city': 'contact_city',
   };
 
   // Sort by priority and find first missing question that meets conditions

@@ -55,11 +55,15 @@ const ALLOWED_FIELDS = [
   'name',
   'phone',
   'email',
+  'address',
+  'city',
+  'contact',      // LLM often returns contact as nested object
   'access',
   'hazards',
   'urgency',
   'haul_away',
   'gate_width_ft',
+  'location',     // LLM sometimes returns location at root level
 ] as const;
 
 // Value ranges for clamping/nulling
@@ -82,13 +86,15 @@ const SERVICE_CONTEXT = {
 
 // Zod schemas for each field type
 const accessSchema = z.object({
+  location: z.enum(['front_yard', 'backyard']).optional(),
   gate_width_ft: z.number().optional(),
   slope: z.enum(['easy', 'moderate', 'steep']).optional(),
 }).optional();
 
 const hazardsSchema = z.object({
   power_lines: z.boolean().optional(),
-  nearby_structures: z.boolean().optional(),
+  structures_nearby: z.boolean().optional(),  // Match session.ts field name
+  nearby_structures: z.boolean().optional(),  // Accept alternate name from LLM
   other: z.string().optional(),
 }).optional();
 
@@ -125,6 +131,15 @@ const SERVICE_TYPES = [
   'other',
 ] as const;
 
+// Contact schema for nested contact object from LLM
+const contactSchema = z.object({
+  name: z.string().optional(),
+  phone: z.string().optional(),
+  email: z.string().optional(),  // Don't require valid email format - LLM might return partial
+  address: z.string().optional(),
+  city: z.string().optional(),
+}).optional();
+
 // Main patch schema - using z.coerce for automatic type coercion
 // LLM often returns wrong types (zip as number, tree_count as string)
 const patchSchema = z.object({
@@ -135,7 +150,11 @@ const patchSchema = z.object({
   zip: z.coerce.string().optional(),  // Auto-converts 54855 -> "54855"
   name: z.string().optional(),
   phone: z.string().optional(),
-  email: z.string().email().optional(),
+  email: z.string().optional(),  // Relaxed - don't require strict email format
+  address: z.string().optional(),
+  city: z.string().optional(),
+  contact: contactSchema,  // LLM often returns nested contact object
+  location: z.enum(['front_yard', 'backyard']).optional(),  // LLM sometimes returns at root
   access: accessSchema,
   hazards: hazardsSchema,
   urgency: z.enum(['normal', 'urgent', 'emergency']).optional(),

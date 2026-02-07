@@ -4,7 +4,15 @@ import crypto from "crypto";
 import fs from "fs/promises";
 import path from "path";
 import { format } from "date-fns";
-import type { SessionState } from "./types";
+import type { SessionState } from "./session";
+import type { Lead } from "./lead";
+import { ensureLeadSchema } from "./lead-migration";
+import { 
+  isCloudflareEnv, 
+  d1LoadSession, 
+  d1SaveSession, 
+  d1DeleteSession 
+} from "./storage-cloudflare";
 
 const SESSIONS_DIR = path.join(process.cwd(), ".sessions");
 
@@ -169,18 +177,93 @@ async function getAdapter(): Promise<StorageAdapter> {
 }
 
 export async function loadSession(sessionId: string): Promise<SessionState | null> {
+  // Use D1 in Cloudflare environment
+  if (isCloudflareEnv()) {
+    return d1LoadSession(sessionId);
+  }
+  // Fallback to PostgreSQL or file adapter
   const adapter = await getAdapter();
   return adapter.load<SessionState>(sessionId);
 }
 
 export async function saveSession(sessionId: string, data: SessionState): Promise<void> {
+  // Use D1 in Cloudflare environment
+  if (isCloudflareEnv()) {
+    await d1SaveSession(sessionId, data);
+    return;
+  }
+  // Fallback to PostgreSQL or file adapter
   const adapter = await getAdapter();
   await adapter.save(sessionId, data);
 }
 
 export async function deleteSession(sessionId: string): Promise<void> {
+  // Use D1 in Cloudflare environment
+  if (isCloudflareEnv()) {
+    await d1DeleteSession(sessionId);
+    return;
+  }
+  // Fallback to PostgreSQL or file adapter
   const adapter = await getAdapter();
   await adapter.delete(sessionId);
+}
+
+// ----------------------
+// FIND SESSION BY PHONE
+// ----------------------
+export async function findSessionByPhone(phone: string): Promise<SessionState | null> {
+  const digits = phone.replace(/\D/g, "");
+  const normalized = digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
+
+  if (isCloudflareEnv()) {
+    console.warn("[Storage] findSessionByPhone not supported in D1 environment yet");
+    return null;
+  }
+
+  // Try PostgreSQL first if configured
+  if (process.env.DATABASE_URL) {
+    const pool = await getPostgresPool();
+    if (pool) {
+      try {
+        const result = await pool.query(
+          `SELECT data FROM sessions
+           WHERE (data->'contact'->>'phone') = $1
+              OR (data->'contact'->>'phone') = $2
+           ORDER BY updated_at DESC
+           LIMIT 1`,
+          [normalized, digits]
+        );
+        if (result.rows.length > 0) {
+          return result.rows[0].data as SessionState;
+        }
+      } catch (err) {
+        console.error("[Storage] PostgreSQL findSessionByPhone error:", err);
+      }
+    }
+  }
+
+  // Fallback: scan local session files
+  try {
+    const files = await fs.readdir(SESSIONS_DIR);
+    for (const file of files) {
+      if (!file.endsWith(".json")) continue;
+      try {
+        const data = await fs.readFile(path.join(SESSIONS_DIR, file), "utf-8");
+        const session = JSON.parse(data) as SessionState;
+        const stored = (session?.contact?.phone || "").replace(/\D/g, "");
+        const storedNormalized = stored.length === 11 && stored.startsWith("1") ? stored.slice(1) : stored;
+        if (storedNormalized && storedNormalized === normalized) {
+          return session;
+        }
+      } catch {
+        // ignore malformed session file
+      }
+    }
+  } catch (err) {
+    console.error("[Storage] File scan findSessionByPhone error:", err);
+  }
+
+  return null;
 }
 
 // ----------------------
@@ -219,4 +302,42 @@ export async function getStorageType(): Promise<"postgres" | "memory"> {
     if (pool) return "postgres";
   }
   return "memory";
+}
+
+// ----------------------
+// LEAD STORAGE (with auto-upgrade)
+// ----------------------
+
+/**
+ * Load a lead, auto-upgrading old SessionState format if needed.
+ * Returns null if not found.
+ */
+export async function loadLead(sessionId: string): Promise<Lead | null> {
+  const adapter = await getAdapter();
+  const raw = await adapter.load<unknown>(sessionId);
+  
+  if (!raw) return null;
+  
+  const lead = ensureLeadSchema(raw);
+  
+  if (lead) {
+    // If this was an upgrade, persist the new format
+    const wasUpgraded = !('version' in (raw as object));
+    if (wasUpgraded) {
+      console.log(`[Storage] Auto-upgraded session ${sessionId} to Lead v${lead.version}`);
+      await adapter.save(sessionId, lead);
+    }
+    return lead;
+  }
+  
+  console.warn(`[Storage] Unknown schema format for session ${sessionId}`);
+  return null;
+}
+
+/**
+ * Save a lead to storage.
+ */
+export async function saveLead(sessionId: string, lead: Lead): Promise<void> {
+  const adapter = await getAdapter();
+  await adapter.save(sessionId, lead);
 }

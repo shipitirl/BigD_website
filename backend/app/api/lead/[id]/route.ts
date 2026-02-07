@@ -3,8 +3,9 @@
 // ============================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession, saveSession, SessionState } from '@/api/lib/session';
+import { SessionState } from '@/api/lib/session';
 import { sendEstimateToCustomer, sendBookingConfirmation } from '@/api/lib/sms';
+import { loadSession, saveSession } from '@/api/lib/utils';
 import { verifyAdminToken } from '@/api/lib/tokens';
 import { withIdempotency } from '@/api/lib/idempotency';
 import { getAllowedActions } from '@/api/lib/validation';
@@ -53,7 +54,7 @@ export async function GET(
     );
   }
 
-  const session = getSession(id);
+  const session = await loadSession(id);
   if (!session) {
     return NextResponse.json(
       { error: 'Lead not found' },
@@ -88,7 +89,7 @@ export async function POST(
     const body = await request.json();
     const { action, adjusted_min, adjusted_max, approve_without_photos } = body;
 
-    const session = getSession(id);
+    const session = await loadSession(id);
     if (!session) {
       return NextResponse.json(
         { error: 'Lead not found' },
@@ -129,7 +130,7 @@ export async function POST(
             (session as any).ownerApprovedWithoutPhotos = true;
           }
           
-          saveSession(session);
+          await saveSession(id, session);
           logger.ownerApproved(id);
 
           // Send SMS to customer (only if allowed)
@@ -178,7 +179,7 @@ export async function POST(
           }
           
           session.status = 'approved';
-          saveSession(session);
+          await saveSession(id, session);
           logger.ownerApproved(id, adjusted_max);
 
           // Send SMS to customer (only if allowed)

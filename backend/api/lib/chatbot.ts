@@ -1,7 +1,9 @@
 // backend/api/lib/chatbot.ts
 
 import { z } from "zod";
-import type { SessionState, Estimate } from "./types";
+import type { SessionState, Estimate } from "./session";
+import { createSession } from "./session";
+import { validateLLMPatch, type SanitizedPatch } from "./validation";
 
 // Zod schema for server-side validation
 export const ChatRequestSchema = z.object({
@@ -22,50 +24,113 @@ const openai = new OpenAI({
 // ----------------------
 function generateSystemPrompt(state: SessionState): string {
   const definitions = `
-  - Service Types: tree_removal, stump_grinding, trimming, storm_cleanup
-  - Access: easy (driveway/front yard), medium (gate/fence), hard (tight/steep/backyard if difficult)
-  - Urgency: normal, urgent (soon), emergency (immediate hazard)
-  - Location: front_yard, back_yard, side_yard
+  - Service Types: tree_removal, tree_trimming, stump_grinding, emergency_storm, storm_prep, land_clearing, other
+  - Access Location: front_yard, backyard
+  - Slope: easy, moderate, steep
+  - Urgency: normal, urgent, emergency
   `;
 
+  // Build state with explicit notes for LLM to understand null vs false
   const stateJson = JSON.stringify({
     zip: state.zip || null,
-    serviceType: state.serviceType || "unknown",
-    treeCount: state.treeCount || null,
-    hasPowerLines: state.hasPowerLines,
-    access: state.access || null,
-    location: state.location || null,
-    haulAway: state.haulAway,
+    service_type: state.service_type || null,
+    tree_count: state.tree_count || null,
+    urgency: state.urgency, // "normal", "urgent", or "emergency"
+    access: {
+      location: state.access.location || null,
+      gate_width_ft: state.access.gate_width_ft,
+      slope: state.access.slope || null,
+    },
+    hazards: {
+      // null = not asked yet, false = user said NO, true = user said YES
+      power_lines: state.hazards.power_lines,
+      structures_nearby: state.hazards.structures_nearby,
+    },
+    // null = not asked, true = yes, false = no, "unsure" = user doesn't know (valid answer)
+    haul_away: state.haul_away,
     contact: state.contact,
+    // Fields we've already asked about (don't re-ask these)
+    questions_asked: state.questions_asked || [],
   });
 
   return `You are Corey, the friendly and professional AI assistant for Big D's Tree Service.
   Your goal is to collect the following information from the user to provide an estimate:
-  1. Zip Code
+  1. Zip Code (5-digit number)
   2. Service Type (remove, trim, stump grind, storm clean)
   3. Tree Count (number of trees/stumps)
-  4. Location (Front/Back/Side yard) - Ask this specifically if unknown.
+  4. Location (Front yard / Backyard) - Ask this specifically if unknown.
   5. Power Lines (Yes/No)
-  6. Access (Easy/Medium/Hard)
-  7. Haul Away (Yes/No)
-  8. Contact Name & Phone (Ask these LAST, after job details).
+  6. Structures Nearby (Yes/No)
+  7. Slope (Easy/Moderate/Steep)
+  8. Haul Away (Yes/No)
+  9. Contact Name, Phone, Email, Address, and City (Ask these LAST, after job details, BUT BEFORE PHOTOS).
 
-  Current Session State: \${stateJson}
-  Definitions: \${definitions}
+  Current Session State: ${stateJson}
+  Definitions: ${definitions}
 
   Instructions:
-  - Analyze the user's message and extract any new information.
-  - If the user provides info, update the corresponding field.
-  - "Tree removal" -> serviceType: "tree_removal" (Catch both "remove" and "removal").
-  - "Front yard" implies access: "easy" AND location: "front_yard".
-  - If specific details are missing, ask for them politely ONE or TWO at a time.
-  - Do NOT ask for everything at once.
+
+  CRITICAL - EXTRACTION FIRST:
+  - BEFORE responding, carefully scan the ENTIRE user message and extract ALL relevant information.
+  - Users may provide multiple details in one message (e.g., "I need 3 trees removed from my backyard at 75201, there are power lines nearby").
+  - You MUST capture every piece of information provided, even if it's embedded in a longer message.
+  - Include ALL extracted fields in "updated_fields" - do not ignore information just because multiple details were given at once.
+
+  FIELD EXTRACTION HINTS:
+  - "Tree removal", "remove", "cut down", "take out" -> service_type: "tree_removal"
+  - "Trim", "trimming", "prune", "pruning" -> service_type: "tree_trimming"
+  - "Stump", "grind", "grinding" -> service_type: "stump_grinding"
+  - "Storm", "emergency", "fallen", "fell", "broke", "crashed", "down", "tree fell", "tree down" -> service_type: "emergency_storm"
+  - NOTE: If a tree "fell on" something, it's emergency_storm AND implies tree_count: 1
+  - "Front yard", "front" -> access.location: "front_yard"
+  - "Backyard", "back yard", "back" -> access.location: "backyard"
+  - 5-digit numbers -> likely zip code
+  - Numbers followed by "tree(s)" or in context of trees -> tree_count
+  - "A tree", "the tree", "a huge tree", "one tree" (singular) -> tree_count: 1
+  - "Power lines", "wires", "electrical" -> hazards.power_lines: true
+  - "Near house", "close to building", "by the fence" -> hazards.structures_nearby: true
+  - "On my house", "hit my house", "on my car", "on my roof", "on the garage", "fell on my house", "fell on house" -> hazards.structures_nearby: true
+  - "Flat", "level", "no slope" -> access.slope: "easy"
+  - "Hill", "slight incline", "some slope" -> access.slope: "moderate"
+  - "Steep", "very hilly", "significant slope", "wet", "soft ground" -> access.slope: "steep"
+
+  URGENCY DETECTION (set urgency field):
+  - "Fell on my house", "on my roof", "blocking driveway", "can't get out", "dangerous", "urgent", "ASAP", "emergency", "right away" -> urgency: "emergency"
+  - If service_type is "emergency_storm" AND tree is on/near a structure -> urgency: "emergency"
+
+  CONVERSATIONAL STYLE:
+  - After extracting all info, acknowledge what you understood (e.g., "Got it - 3 trees for removal in the backyard at 75201, with power lines nearby.")
+  - Then ask ONLY for the remaining MISSING details (fields that are null in the Current Session State), ONE or TWO at a time.
+  - CRITICAL STATE INTERPRETATION:
+    * null = NOT ASKED YET (you should ask)
+    * false = USER SAID "NO" (do NOT re-ask!)
+    * true = USER SAID "YES" (do NOT re-ask!)
+    * "unsure" for haul_away = USER DOESN'T KNOW (valid final answer, do NOT re-ask!)
+  - CRITICAL: NEVER ask for information that is already present in the session state above. Check the state BEFORE asking each question.
+    * If tree_count is NOT null, do NOT ask "How many trees"
+    * If zip is NOT null, do NOT ask for zip code
+    * If service_type is NOT null, do NOT ask what service they need
+    * If hazards.power_lines is true OR false, do NOT ask about power lines (only ask if null)
+    * If haul_away is true, false, OR "unsure", do NOT ask about haul away
+    * etc.
+  - PHRASING RULE: When asking for tree count (ONLY if tree_count is null), use: "How many trees and/or stumps seem to have issues?"
   - If the user asks a question, answer it briefly.
-  - If you have all job details (1-7), ask for Contact Name & Phone.
-  - If you have Name & Phone, say "READY_FOR_FINAL" in your thought process, and tell the user you will get their photos to Corey.
+  - If you have all job details (1-8), ask for Contact Name, Phone, AND Email.
+  - EMAIL VALIDATION: An email is valid if it matches this pattern: <local>@<domain>.<tld> where:
+    * local part: letters, numbers, dots, underscores, hyphens (e.g., "john.doe", "user123")
+    * domain: letters, numbers, hyphens (e.g., "gmail", "company-name")
+    * tld: 2+ letters (e.g., "com", "org", "co.uk")
+    * VALID examples: john@gmail.com, user.name@company.org, test123@mail.co.uk
+    * INVALID examples: john@ (no domain), @gmail.com (no local), john@.com (empty domain), john@com (no TLD dot)
+  - ONLY when you have Name, Phone, valid Email, Address, and City, should you say "READY_FOR_PHOTOS" in your thought process.
+  - Tell the user: "Thanks! Now I just need to see the trees. Please upload a few photos so Corey can give you an accurate estimate."
 
   CRITICAL: You must include "updated_fields" in your JSON response for ANY new information you identify.
-  Keys must match EXACTLY: zip, serviceType, treeCount, hasPowerLines, access, location, haulAway, contact.
+  Keys must match EXACTLY: zip, service_type, tree_count, access, hazards, haul_away, urgency, contact.
+  - access is an object: { location: "front_yard"|"backyard", gate_width_ft: number|null, slope: "easy"|"moderate"|"steep" }
+  - hazards is an object: { power_lines: boolean, structures_nearby: boolean }
+  - urgency is a string: "normal" | "urgent" | "emergency"
+  - contact is an object: { name: string, phone: string, email: string, address: string, city: string }
 
   You must output a JSON object ONLY:
   {
@@ -77,69 +142,274 @@ function generateSystemPrompt(state: SessionState): string {
 }
 
 // ----------------------
+// APPLY VALIDATED PATCH TO STATE
+// ----------------------
+function applyValidatedPatch(state: SessionState, patch: SanitizedPatch, rawFields: any): void {
+  // Apply validated fields from validation layer
+  if (patch.zip) state.zip = patch.zip;
+  if (patch.service_type) state.service_type = patch.service_type as SessionState['service_type'];
+  if (patch.tree_count !== undefined) state.tree_count = patch.tree_count;
+  if (patch.urgency) state.urgency = patch.urgency as SessionState['urgency'];
+  if (patch.haul_away !== undefined) state.haul_away = patch.haul_away;
+
+  // Handle access object
+  if (patch.access) {
+    if (patch.access.location) {
+      state.access.location = patch.access.location as SessionState['access']['location'];
+    }
+    if (patch.access.gate_width_ft !== undefined) {
+      state.access.gate_width_ft = patch.access.gate_width_ft;
+    }
+    if (patch.access.slope) {
+      state.access.slope = patch.access.slope as SessionState['access']['slope'];
+    }
+  }
+
+  // Handle hazards object
+  if (patch.hazards) {
+    if (patch.hazards.power_lines !== undefined) {
+      state.hazards.power_lines = patch.hazards.power_lines;
+    }
+    // Handle both field names (structures_nearby and nearby_structures)
+    const structuresNearby = (patch.hazards as any).structures_nearby ?? (patch.hazards as any).nearby_structures;
+    if (structuresNearby !== undefined) {
+      state.hazards.structures_nearby = structuresNearby;
+    }
+  }
+
+  // Handle contact - validation layer uses name/phone/email/address/city at root level
+  if (patch.name) state.contact.name = patch.name;
+  if (patch.phone) state.contact.phone = patch.phone;
+  if (patch.email) state.contact.email = patch.email;
+  if ((patch as any).address) state.contact.address = (patch as any).address;
+  if ((patch as any).city) state.contact.city = (patch as any).city;
+
+  // Handle nested contact object from validated patch
+  if ((patch as any).contact) {
+    const c = (patch as any).contact;
+    if (c.name) state.contact.name = c.name;
+    if (c.phone) state.contact.phone = c.phone;
+    if (c.email) state.contact.email = c.email;
+    if (c.address) state.contact.address = c.address;
+    if (c.city) state.contact.city = c.city;
+  }
+
+  // Handle location at root level from validated patch
+  if ((patch as any).location) {
+    state.access.location = (patch as any).location as SessionState['access']['location'];
+  }
+
+  // Also check nested contact from raw LLM output (fallback)
+  if (rawFields.contact) {
+    if (rawFields.contact.name) state.contact.name = rawFields.contact.name;
+    if (rawFields.contact.phone && !state.contact.phone) state.contact.phone = rawFields.contact.phone;
+    if (rawFields.contact.email && !state.contact.email) state.contact.email = rawFields.contact.email;
+    if (rawFields.contact.address && !state.contact.address) state.contact.address = rawFields.contact.address;
+    if (rawFields.contact.city && !state.contact.city) state.contact.city = rawFields.contact.city;
+  }
+
+  // Handle access.location from raw fields if validation didn't catch it
+  if (rawFields.access?.location && !state.access.location) {
+    const loc = String(rawFields.access.location).toLowerCase().replace(" ", "_");
+    state.access.location = loc === 'backyard' ? 'backyard' : 'front_yard';
+  }
+}
+
+// ----------------------
+// MANUAL EXTRACTION FALLBACK
+// ----------------------
+function applyManualExtraction(state: SessionState, u: any): void {
+  // Fallback extraction when validation rejects the patch
+  if (u.zip) state.zip = String(u.zip);
+
+  if (u.service_type) {
+    const normalized = String(u.service_type).toLowerCase()
+      .replace("tree removal", "tree_removal")
+      .replace("stump grinding", "stump_grinding")
+      .replace("storm cleanup", "emergency_storm")
+      .replace("tree trimming", "tree_trimming")
+      .replace("storm prep", "storm_prep")
+      .replace(" ", "_");
+    state.service_type = normalized as SessionState['service_type'];
+  }
+
+  if (u.tree_count !== undefined) {
+    state.tree_count = typeof u.tree_count === 'string' ? parseInt(u.tree_count) : u.tree_count;
+  }
+
+  if (u.access) {
+    if (u.access.location) {
+      const loc = String(u.access.location).toLowerCase().replace(" ", "_");
+      state.access.location = loc === 'backyard' ? 'backyard' : 'front_yard';
+    }
+    if (u.access.gate_width_ft !== undefined) {
+      state.access.gate_width_ft = typeof u.access.gate_width_ft === 'string'
+        ? parseInt(u.access.gate_width_ft)
+        : u.access.gate_width_ft;
+    }
+    if (u.access.slope) {
+      const slope = String(u.access.slope).toLowerCase();
+      state.access.slope = (slope === 'steep' || slope === 'moderate') ? slope : 'easy';
+    }
+  }
+
+  if (u.hazards) {
+    if (u.hazards.power_lines !== undefined) {
+      state.hazards.power_lines = u.hazards.power_lines === true ||
+        String(u.hazards.power_lines).toLowerCase() === 'yes' ||
+        String(u.hazards.power_lines).toLowerCase() === 'true';
+    }
+    if (u.hazards.structures_nearby !== undefined) {
+      state.hazards.structures_nearby = u.hazards.structures_nearby === true ||
+        String(u.hazards.structures_nearby).toLowerCase() === 'yes' ||
+        String(u.hazards.structures_nearby).toLowerCase() === 'true';
+    }
+  }
+
+  if (u.haul_away !== undefined) {
+    if (typeof u.haul_away === 'string') {
+      const lower = u.haul_away.toLowerCase();
+      state.haul_away = lower === 'unsure' ? 'unsure' : (lower === 'yes' || lower === 'true');
+    } else {
+      state.haul_away = !!u.haul_away;
+    }
+  }
+
+  if (u.urgency) {
+    const urgency = String(u.urgency).toLowerCase();
+    state.urgency = (urgency === 'emergency' || urgency === 'urgent') ? 'emergency' : 'normal';
+  }
+
+  if (u.contact) {
+    if (u.contact.name) state.contact.name = u.contact.name;
+    if (u.contact.phone) state.contact.phone = u.contact.phone;
+    if (u.contact.email) state.contact.email = u.contact.email;
+    if (u.contact.address) state.contact.address = u.contact.address;
+    if (u.contact.city) state.contact.city = u.contact.city;
+  }
+}
+
+// ----------------------
 // MAIN CHAT TURN (LLM)
 // ----------------------
 export async function runChatTurn(state: SessionState, userMessage: string) {
   // Update timestamp
-  state.updatedAt = new Date().toISOString();
+  state.updated_at = new Date().toISOString();
   state.messages.push({ role: "user", content: userMessage });
 
   let assistantMessage = "";
   let nextQuestions: string[] = [];
 
   try {
+    const systemPrompt = generateSystemPrompt(state);
+    console.log(`[LLM] User message length: ${userMessage.length} chars`);
+
+    // FIX #3: Truncate message history to last 15 messages to reduce latency
+    const MAX_MESSAGES = 15;
+    const truncatedMessages = state.messages.length > MAX_MESSAGES
+      ? state.messages.slice(-MAX_MESSAGES)
+      : state.messages;
+
+    console.log(`[LLM] Sending ${truncatedMessages.length} messages (truncated from ${state.messages.length})`);
+
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini", // Using the latest mini model
+      model: "gpt-4o-mini", // GPT-4o-mini for better extraction while keeping costs lower
       messages: [
-        { role: "system", content: generateSystemPrompt(state) },
-        ...state.messages.map(m => ({ role: m.role as "user" | "assistant", content: m.content })),
+        { role: "system", content: systemPrompt },
+        ...truncatedMessages.map(m => ({ role: m.role as "user" | "assistant", content: m.content })),
       ],
       response_format: { type: "json_object" },
-      temperature: 0.2, // Low temp for extraction reliability
+
+      max_completion_tokens: 1500, // More room for detailed responses
     });
 
-    const result = JSON.parse(completion.choices[0].message.content || "{}");
+    const rawContent = completion.choices[0]?.message?.content || "";
+    const finishReason = completion.choices[0]?.finish_reason;
 
-    // 1. Update State (with safe coercion)
-    if (result.updated_fields) {
-       const u = result.updated_fields;
-       if (u.zip) state.zip = u.zip;
-       
-       if (u.serviceType) state.serviceType = u.serviceType.toLowerCase().replace("tree removal", "tree_removal").replace("stump grinding", "stump_grinding").replace("storm cleanup", "storm_cleanup"); // Basic normalization in case LLM forgets underscore
+    console.log(`[LLM] Finish reason: ${finishReason}`);
+    console.log(`[LLM] Raw content length: ${rawContent.length}`);
 
-       if (u.treeCount !== undefined) state.treeCount = typeof u.treeCount === 'string' ? parseInt(u.treeCount) : u.treeCount;
-       
-       if (u.hasPowerLines !== undefined) {
-          if (typeof u.hasPowerLines === 'string') {
-             const lower = u.hasPowerLines.toLowerCase();
-             state.hasPowerLines = (lower === 'yes' || lower === 'true');
-          } else {
-             state.hasPowerLines = !!u.hasPowerLines;
+    // Handle empty or malformed response
+    if (!rawContent || rawContent.trim() === "") {
+      console.error("LLM returned empty response. Full completion object:", JSON.stringify(completion));
+      assistantMessage = "I didn't catch that. Could you please repeat what you said?";
+    } else {
+      let result: any;
+      try {
+        // CLEANUP: Remove ```json ... ``` wrappers if present
+        let cleanContent = rawContent.trim();
+        if (cleanContent.startsWith("```")) {
+          cleanContent = cleanContent.replace(/^```json\s*/, "").replace(/^```\s*/, "").replace(/\s*```$/, "");
+        }
+        
+        result = JSON.parse(cleanContent);
+      } catch (parseError) {
+        console.error("LLM JSON parse error:", parseError, "Raw:", rawContent.substring(0, 200));
+        assistantMessage = "I had a hiccup processing that. Could you please try again?";
+        result = {};
+      }
+
+      // 1. Validate and Update State using validation layer
+      if (result.updated_fields) {
+         console.log(`[LLM] Raw extracted fields:`, JSON.stringify(result.updated_fields, null, 2));
+
+         // Validate through validation layer (handles type coercion, range checks, etc.)
+         const validation = validateLLMPatch(result.updated_fields, state.service_type || undefined);
+
+         if (validation.ok) {
+           const patch = validation.patch;
+           if (validation.warnings?.length) {
+             console.log(`[Validation] Warnings:`, validation.warnings);
+           }
+
+           // Apply validated patch to state
+           applyValidatedPatch(state, patch, result.updated_fields);
+           console.log(`[LLM] Applied validated fields`);
+         } else {
+           const failure = validation as { reason: string; details: string };
+           console.warn(`[Validation] Rejected: ${failure.reason} - ${failure.details}`);
+           // Fall back to manual extraction for rejected patches
+           applyManualExtraction(state, result.updated_fields);
+         }
+      } else {
+         console.log(`[LLM] No updated_fields in response`);
+      }
+
+      // 2. Set Response
+      if (result.assistant_message) {
+        assistantMessage = result.assistant_message;
+      }
+      nextQuestions = result.next_questions || [];
+
+      // FIX #1: Track questions asked to prevent repeating questions
+      // Map common question patterns to question IDs
+      if (nextQuestions.length > 0 || result.assistant_message) {
+        const questionPatterns: Array<{ pattern: RegExp; id: string }> = [
+          { pattern: /zip\s*code|what.*zip|your\s*zip/i, id: 'zip' },
+          { pattern: /how\s*many\s*tree|tree.*count|number\s*of\s*tree/i, id: 'tree_count' },
+          { pattern: /haul\s*away|debris|take.*away|remove.*material/i, id: 'haul_debris' },
+          { pattern: /front\s*yard|backyard|where.*located|work\s*area\s*located/i, id: 'access_location' },
+          { pattern: /gate\s*width|how\s*wide.*gate/i, id: 'gate_width' },
+          { pattern: /slope|steep|ground\s*condition|wet.*ground/i, id: 'slope' },
+          { pattern: /power\s*line|electrical|wire/i, id: 'power_lines' },
+          { pattern: /structure|house|garage|fence|building/i, id: 'structures' },
+          { pattern: /your\s*name|what.*name/i, id: 'contact_name' },
+          { pattern: /phone\s*number|reach\s*you|call\s*you/i, id: 'contact_phone' },
+          { pattern: /email\s*address|your\s*email/i, id: 'contact_email' },
+          { pattern: /address|street\s*address/i, id: 'contact_address' },
+          { pattern: /city/i, id: 'contact_city' },
+        ];
+
+        const textToCheck = [...nextQuestions, result.assistant_message || ''].join(' ');
+
+        for (const { pattern, id } of questionPatterns) {
+          if (pattern.test(textToCheck) && !state.questions_asked.includes(id)) {
+            state.questions_asked.push(id);
+            console.log(`[Questions] Marked as asked: ${id}`);
           }
-       }
-
-       if (u.access) state.access = u.access.toLowerCase();
-       if (u.location) state.location = u.location.toLowerCase().replace(" ", "_"); // front yard -> front_yard if LLM slips up
-
-       if (u.haulAway !== undefined) {
-         if (typeof u.haulAway === 'string') {
-             const lower = u.haulAway.toLowerCase();
-             state.haulAway = (lower === 'yes' || lower === 'true');
-          } else {
-             state.haulAway = !!u.haulAway;
-          }
-       }
-
-       if (u.contact) {
-         if (u.contact.name) state.contact.name = u.contact.name;
-         if (u.contact.phone) state.contact.phone = u.contact.phone;
-         if (u.contact.email) state.contact.email = u.contact.email;
-       }
+        }
+      }
     }
-
-    // 2. Set Response
-    assistantMessage = result.assistant_message || "I'm sorry, I missed that. Could you repeat?";
-    nextQuestions = result.next_questions || [];
 
   } catch (err) {
     console.error("LLM Error:", err);
@@ -160,7 +430,7 @@ export async function runChatTurn(state: SessionState, userMessage: string) {
       `Corey will personally review everything to ensure accuracy and email you a custom estimate shortly.`;
   } else if (readyForPhotos) {
     state.status = "awaiting_photos";
-     if (!state.hasPhotos) {
+     if (!state.photos_uploaded) {
        assistantMessage = `Great, I have most of what I need! Please upload 2-4 photos:\n\n` +
       `* Wide shot showing the full tree(s)\n` +
       `* Close-up of the trunk/base\n` +
@@ -183,42 +453,217 @@ export async function runChatTurn(state: SessionState, userMessage: string) {
 }
 
 // ----------------------
-// STREAMING GENERATOR
+// INCREMENTAL JSON PARSER FOR STREAMING
+// Extracts assistant_message content as it streams in
+// ----------------------
+class AssistantMessageExtractor {
+  private buffer = "";
+  private inAssistantMessage = false;
+  private foundKey = false;
+  private stringDepth = 0;
+  private escapeNext = false;
+
+  // Feed a chunk and get any extractable assistant_message content
+  feed(chunk: string): string {
+    let output = "";
+
+    for (const char of chunk) {
+      this.buffer += char;
+
+      if (this.inAssistantMessage) {
+        // We're inside the assistant_message string value
+        if (this.escapeNext) {
+          // Previous char was \, so this char is escaped
+          output += char;
+          this.escapeNext = false;
+        } else if (char === "\\") {
+          // Escape character - next char is escaped
+          this.escapeNext = true;
+          output += char;
+        } else if (char === '"') {
+          // End of assistant_message string
+          this.inAssistantMessage = false;
+        } else {
+          output += char;
+        }
+      } else {
+        // Looking for "assistant_message": "
+        if (!this.foundKey && this.buffer.includes('"assistant_message"')) {
+          this.foundKey = true;
+        }
+
+        if (this.foundKey && !this.inAssistantMessage) {
+          // Look for the opening quote of the value
+          // Pattern: "assistant_message": "  or  "assistant_message":"
+          const match = this.buffer.match(/"assistant_message"\s*:\s*"/);
+          if (match) {
+            this.inAssistantMessage = true;
+            // Clear buffer to avoid re-matching
+            this.buffer = "";
+          }
+        }
+      }
+    }
+
+    // Unescape common JSON escape sequences for display
+    return output
+      .replace(/\\n/g, "\n")
+      .replace(/\\t/g, "\t")
+      .replace(/\\"/g, '"')
+      .replace(/\\\\/g, "\\");
+  }
+
+  reset() {
+    this.buffer = "";
+    this.inAssistantMessage = false;
+    this.foundKey = false;
+    this.stringDepth = 0;
+    this.escapeNext = false;
+  }
+}
+
+// ----------------------
+// STREAMING GENERATOR (Real OpenAI streaming with incremental JSON parsing)
 // ----------------------
 export async function* streamChatTurn(
   state: SessionState,
   userMessage: string
 ): AsyncGenerator<string> {
-  const result = await runChatTurn(state, userMessage);
+  // Update timestamp and add user message
+  state.updated_at = new Date().toISOString();
+  state.messages.push({ role: "user", content: userMessage });
 
-  // Simulate streaming by yielding chunks
-  const words = result.assistantMessage.split(" ");
-  let buffer = "";
+  const systemPrompt = generateSystemPrompt(state);
 
-  for (const word of words) {
-    buffer += (buffer ? " " : "") + word;
-    yield word + " ";
-    // Small delay to simulate streaming feel
-    await new Promise((resolve) => setTimeout(resolve, 20));
+  // Truncate message history to last 15 messages
+  const MAX_MESSAGES = 15;
+  const truncatedMessages = state.messages.length > MAX_MESSAGES
+    ? state.messages.slice(-MAX_MESSAGES)
+    : state.messages;
+
+  let fullContent = "";
+  let assistantMessage = "";
+  const extractor = new AssistantMessageExtractor();
+
+  try {
+    // Use actual OpenAI streaming
+    const stream = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: systemPrompt },
+        ...truncatedMessages.map(m => ({ role: m.role as "user" | "assistant", content: m.content })),
+      ],
+      response_format: { type: "json_object" },
+      max_completion_tokens: 1500,
+      stream: true,
+    });
+
+    // Stream chunks as they arrive, extracting assistant_message content
+    for await (const chunk of stream) {
+      const content = chunk.choices[0]?.delta?.content || "";
+      if (content) {
+        fullContent += content;
+
+        // Extract and yield assistant_message content incrementally
+        const extracted = extractor.feed(content);
+        if (extracted) {
+          assistantMessage += extracted;
+          yield extracted;
+        }
+      }
+    }
+
+    // Parse the complete JSON response for state updates
+    let result: any = {};
+    try {
+      let cleanContent = fullContent.trim();
+      if (cleanContent.startsWith("```")) {
+        cleanContent = cleanContent.replace(/^```json\s*/, "").replace(/^```\s*/, "").replace(/\s*```$/, "");
+      }
+      result = JSON.parse(cleanContent);
+    } catch (parseError) {
+      console.error("[Stream] JSON parse error:", parseError);
+      result = { assistant_message: assistantMessage };
+    }
+
+    // Apply state updates
+    if (result.updated_fields) {
+      const validation = validateLLMPatch(result.updated_fields, state.service_type || undefined);
+      if (validation.ok) {
+        applyValidatedPatch(state, validation.patch, result.updated_fields);
+      } else {
+        applyManualExtraction(state, result.updated_fields);
+      }
+    }
+
+    // Use parsed assistant_message if extractor missed anything
+    if (!assistantMessage && result.assistant_message) {
+      assistantMessage = result.assistant_message;
+      yield assistantMessage;
+    }
+
+    // Track questions asked
+    const nextQuestions = result.next_questions || [];
+    if (nextQuestions.length > 0 || assistantMessage) {
+      const questionPatterns: Array<{ pattern: RegExp; id: string }> = [
+        { pattern: /zip\s*code|what.*zip|your\s*zip/i, id: 'zip' },
+        { pattern: /how\s*many\s*tree|tree.*count|number\s*of\s*tree/i, id: 'tree_count' },
+        { pattern: /haul\s*away|debris|take.*away|remove.*material/i, id: 'haul_debris' },
+        { pattern: /front\s*yard|backyard|where.*located|work\s*area\s*located/i, id: 'access_location' },
+        { pattern: /gate\s*width|how\s*wide.*gate/i, id: 'gate_width' },
+        { pattern: /slope|steep|ground\s*condition|wet.*ground/i, id: 'slope' },
+        { pattern: /power\s*line|electrical|wire/i, id: 'power_lines' },
+        { pattern: /structure|house|garage|fence|building/i, id: 'structures' },
+        { pattern: /your\s*name|what.*name/i, id: 'contact_name' },
+        { pattern: /phone\s*number|reach\s*you|call\s*you/i, id: 'contact_phone' },
+        { pattern: /email\s*address|your\s*email/i, id: 'contact_email' },
+        { pattern: /address|street\s*address/i, id: 'contact_address' },
+        { pattern: /city/i, id: 'contact_city' },
+      ];
+
+      const textToCheck = [...nextQuestions, assistantMessage].join(' ');
+      for (const { pattern, id } of questionPatterns) {
+        if (pattern.test(textToCheck) && !state.questions_asked.includes(id)) {
+          state.questions_asked.push(id);
+        }
+      }
+    }
+
+  } catch (err) {
+    console.error("[Stream] LLM Error:", err);
+    assistantMessage = "I'm having trouble connecting right now. Please try again.";
+    yield assistantMessage;
   }
+
+  // Check readiness and update status
+  const readyForPhotos = isReadyForPhotos(state);
+  const readyForEstimate = isReadyForEstimate(state);
+
+  if (readyForEstimate) {
+    state.status = "ready_for_estimate";
+    state.estimate = calculateEstimate(state);
+    assistantMessage = `Thank you! I've received your photos and details.\n\nCorey will personally review everything to ensure accuracy and email you a custom estimate shortly.`;
+    yield `\n\n${assistantMessage}`;
+  } else if (readyForPhotos && !state.photos_uploaded) {
+    state.status = "awaiting_photos";
+    const photoMsg = `\n\nGreat, I have most of what I need! Please upload 2-4 photos:\n\n* Wide shot showing the full tree(s)\n* Close-up of the trunk/base\n* Any nearby obstacles (power lines, structures)\n\nUse the upload button below when ready.`;
+    assistantMessage += photoMsg;
+    yield photoMsg;
+  } else {
+    state.status = "collecting";
+  }
+
+  state.messages.push({ role: "assistant", content: assistantMessage });
 }
 
 // ----------------------
 // CREATE NEW SESSION
 // ----------------------
 export function createNewSession(sessionId: string): SessionState {
-  const now = new Date().toISOString();
-  return {
-    sessionId,
-    status: "collecting",
-    createdAt: now,
-    updatedAt: now,
-    serviceType: "unknown",
-    photoUrls: [],
-    contact: {},
-    messages: [],
-    questions_asked: [],
-  };
+  const session = createSession();
+  // Override the generated lead_id with the provided sessionId
+  session.lead_id = sessionId;
+  return session;
 }
 
 // ----------------------
@@ -227,22 +672,25 @@ export function createNewSession(sessionId: string): SessionState {
 function isReadyForPhotos(state: SessionState): boolean {
   // Ready for photos when we have:
   // 1. Job info (service type, zip, tree count)
-  // 2. Basic details (power lines, access asked)
-  // 3. Contact info (phone required for finalize)
+  // 2. Basic details (power lines, access location asked)
+  // 3. Contact info (name, phone, email required BEFORE photos)
   return !!(
     state.zip &&
-    state.serviceType &&
-    state.serviceType !== "unknown" &&
-    state.treeCount !== undefined &&
-    (state.hasPowerLines !== undefined || state.questions_asked?.includes('power_lines')) &&
-    (state.access !== undefined || state.questions_asked?.includes('access')) &&
-    (state.location !== undefined || state.questions_asked?.includes('location')) &&
-    state.contact?.phone  // Contact required before photos
+    state.service_type &&
+    state.tree_count !== null &&
+    (state.hazards.power_lines !== null || state.questions_asked?.includes('power_lines')) &&
+    (state.access.location !== null || state.questions_asked?.includes('access_location')) &&
+    (state.access.slope !== null || state.questions_asked?.includes('slope')) &&
+    !!state.contact?.name &&
+    !!state.contact?.phone &&
+    !!state.contact?.email &&
+    !!state.contact?.address &&
+    !!state.contact?.city
   );
 }
 
 function isReadyForEstimate(state: SessionState): boolean {
-  return isReadyForPhotos(state) && state.hasPhotos === true;
+  return isReadyForPhotos(state) && state.photos_uploaded === true;
 }
 
 // ----------------------
@@ -254,7 +702,7 @@ export function calculateEstimate(state: SessionState): Estimate {
   let baseMax = 400;
 
   // Service type pricing
-  switch (state.serviceType) {
+  switch (state.service_type) {
     case "tree_removal":
       baseMin = 500;
       baseMax = 1500;
@@ -265,46 +713,66 @@ export function calculateEstimate(state: SessionState): Estimate {
       baseMax = 400;
       drivers.push("Stump grinding");
       break;
-    case "trimming":
+    case "tree_trimming":
       baseMin = 200;
       baseMax = 800;
       drivers.push("Trimming/pruning");
       break;
-    case "storm_cleanup":
+    case "storm_prep":
+    case "emergency_storm":
       baseMin = 300;
       baseMax = 1200;
-      drivers.push("Storm cleanup");
+      drivers.push("Storm cleanup/prep");
+      break;
+    case "land_clearing":
+      baseMin = 800;
+      baseMax = 3000;
+      drivers.push("Land clearing");
       break;
   }
 
   // Tree count multiplier
-  const count = state.treeCount || 1;
+  const count = state.tree_count || 1;
   if (count > 1) {
     baseMin *= count * 0.8; // Slight discount for multiple
     baseMax *= count * 0.9;
     drivers.push(`${count} trees/stumps`);
   }
 
-  // Access difficulty
-  if (state.access === "hard") {
+  // Access difficulty based on slope and backyard location
+  if (state.access.slope === "steep") {
     baseMin *= 1.3;
     baseMax *= 1.4;
-    drivers.push("Difficult access (+30-40%)");
-  } else if (state.access === "medium") {
+    drivers.push("Steep slope (+30-40%)");
+  } else if (state.access.slope === "moderate") {
     baseMin *= 1.1;
     baseMax *= 1.15;
-    drivers.push("Gate/fence access (+10-15%)");
+    drivers.push("Moderate slope (+10-15%)");
+  }
+
+  // Backyard with narrow gate
+  if (state.access.location === "backyard" && state.access.gate_width_ft !== null && state.access.gate_width_ft < 4) {
+    baseMin *= 1.15;
+    baseMax *= 1.2;
+    drivers.push("Narrow gate access (+15-20%)");
   }
 
   // Power lines
-  if (state.hasPowerLines) {
+  if (state.hazards.power_lines === true) {
     baseMin *= 1.2;
     baseMax *= 1.3;
     drivers.push("Near power lines (+20-30%)");
   }
 
+  // Structures nearby
+  if (state.hazards.structures_nearby === true) {
+    baseMin *= 1.1;
+    baseMax *= 1.15;
+    drivers.push("Near structures (+10-15%)");
+  }
+
   // Haul away
-  if (state.haulAway === true) {
+  if (state.haul_away === true) {
     baseMin += 100;
     baseMax += 200;
     drivers.push("Debris removal (+$100-200)");
@@ -319,9 +787,9 @@ export function calculateEstimate(state: SessionState): Estimate {
 
   // Confidence based on info completeness
   let confidence: "high" | "medium" | "low" = "low";
-  if (state.hasPhotos && state.treeCount && state.access) {
+  if (state.photos_uploaded && state.tree_count && state.access.location) {
     confidence = "high";
-  } else if (state.zip && state.serviceType !== "unknown") {
+  } else if (state.zip && state.service_type !== null) {
     confidence = "medium";
   }
 
