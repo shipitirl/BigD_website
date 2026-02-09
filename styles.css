@@ -79,7 +79,7 @@ a {
 
 /* Hero Section */
 .hero {
-    height: 100dvh;
+    height: 88dvh;
     width: 100%;
     position: relative;
     overflow: hidden;
@@ -403,8 +403,8 @@ a {
 
 /* Sections */
 .section {
-    padding: 8rem 0;
-    min-height: 60vh;
+    padding: 3.5rem 0;
+    min-height: auto;
     display: flex;
     flex-direction: column;
     justify-content: center;
