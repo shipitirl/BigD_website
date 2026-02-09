@@ -40,6 +40,9 @@
         <input type="email" name="email" placeholder="Email" style="padding:.75rem; border:1px solid #cbd5e1; border-radius:8px;" />
         <input name="address" placeholder="Address" style="padding:.75rem; border:1px solid #cbd5e1; border-radius:8px;" />
         <textarea name="details" required placeholder="What are your tree care and preservation needs?" style="min-height:120px; padding:.75rem; border:1px solid #cbd5e1; border-radius:8px;"></textarea>
+        <label style="font-weight:600;">Add Photos (optional)</label>
+        <input type="file" name="photos" id="servicesPhotos" multiple accept="image/*" style="padding:.5rem; border:1px solid #cbd5e1; border-radius:8px; background:#f8fafc;" />
+        <div id="servicesPhotoPreview" style="display:flex; flex-wrap:wrap; gap:.5rem;"></div>
         <button type="submit" class="btn-primary" id="servicesQuoteBtn">Send Request</button>
         <small id="servicesQuoteMsg" style="opacity:.85;"></small>
       </form>
@@ -59,6 +62,29 @@
       const form = document.getElementById('servicesQuoteForm');
       const btn = document.getElementById('servicesQuoteBtn');
       const msg = document.getElementById('servicesQuoteMsg');
+      const photos = document.getElementById('servicesPhotos');
+      const preview = document.getElementById('servicesPhotoPreview');
+
+      photos.addEventListener('change', () => {
+        preview.innerHTML = '';
+        Array.from(photos.files || []).slice(0, 6).forEach(file => {
+          if (!file.type.startsWith('image/')) return;
+          const reader = new FileReader();
+          reader.onload = e => {
+            const img = document.createElement('img');
+            img.src = e.target.result;
+            img.alt = file.name;
+            img.style.width = '84px';
+            img.style.height = '84px';
+            img.style.objectFit = 'cover';
+            img.style.borderRadius = '8px';
+            img.style.border = '1px solid #cbd5e1';
+            preview.appendChild(img);
+          };
+          reader.readAsDataURL(file);
+        });
+      });
+
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
         btn.disabled = true;
@@ -69,6 +95,7 @@
           const res = await fetch(`${API_BASE}/api/quote`, { method:'POST', body: fd });
           if(!res.ok) throw new Error('Request failed');
           form.reset();
+          preview.innerHTML = '';
           msg.textContent = '✅ Request sent. We will reach out shortly.';
         } catch (_) {
           msg.textContent = '❌ Could not send. Please call (262) 215-0497.';
