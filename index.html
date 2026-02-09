@@ -162,6 +162,24 @@
             </div>
         </section>
 
+        <!-- Old-School Quick Quote Form -->
+        <section class="section" id="quick-quote" style="background:#f1f5f9; color:#0f172a;">
+            <div class="container" style="max-width:760px;">
+                <h2 style="margin-bottom:.5rem;">Quick Quote Request</h2>
+                <p style="margin-bottom:1rem; opacity:.9;">Simple form. Add photos. We email the owner directly.</p>
+                <form id="quickQuoteForm" style="display:grid; gap:.75rem; background:#fff; padding:1rem; border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,.1);">
+                    <input name="name" required placeholder="Name" style="padding:.75rem; border:1px solid #cbd5e1; border-radius:8px;">
+                    <input name="phone" required placeholder="Phone Number" style="padding:.75rem; border:1px solid #cbd5e1; border-radius:8px;">
+                    <input type="email" name="email" placeholder="Email" style="padding:.75rem; border:1px solid #cbd5e1; border-radius:8px;">
+                    <input name="address" placeholder="Address" style="padding:.75rem; border:1px solid #cbd5e1; border-radius:8px;">
+                    <textarea name="details" required placeholder="What are your tree care and preservation needs?" style="min-height:120px; padding:.75rem; border:1px solid #cbd5e1; border-radius:8px;"></textarea>
+                    <input type="file" name="photos" id="quickQuotePhotos" multiple accept="image/*">
+                    <button type="submit" class="btn-primary" id="quickQuoteBtn">Send Request</button>
+                    <small id="quickQuoteMsg" style="opacity:.85;"></small>
+                </form>
+            </div>
+        </section>
+
         <!-- Dream Realized -->
         <section class="section dream" id="dream">
             <div class="container fade-in">
@@ -211,23 +229,6 @@
 
 
 
-        <!-- Old-School Quick Quote Form -->
-        <section class="section" id="quick-quote" style="background:#f1f5f9; color:#0f172a;">
-            <div class="container" style="max-width:760px;">
-                <h2 style="margin-bottom:.5rem;">Quick Quote Request</h2>
-                <p style="margin-bottom:1rem; opacity:.9;">Simple form. Add photos. We email the owner directly.</p>
-                <form id="quickQuoteForm" style="display:grid; gap:.75rem; background:#fff; padding:1rem; border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,.1);">
-                    <input name="name" required placeholder="Name" style="padding:.75rem; border:1px solid #cbd5e1; border-radius:8px;">
-                    <input name="phone" required placeholder="Phone Number" style="padding:.75rem; border:1px solid #cbd5e1; border-radius:8px;">
-                    <input type="email" name="email" placeholder="Email" style="padding:.75rem; border:1px solid #cbd5e1; border-radius:8px;">
-                    <input name="address" placeholder="Address" style="padding:.75rem; border:1px solid #cbd5e1; border-radius:8px;">
-                    <textarea name="details" required placeholder="What are your tree care and preservation needs?" style="min-height:120px; padding:.75rem; border:1px solid #cbd5e1; border-radius:8px;"></textarea>
-                    <input type="file" name="photos" id="quickQuotePhotos" multiple accept="image/*">
-                    <button type="submit" class="btn-primary" id="quickQuoteBtn">Send Request</button>
-                    <small id="quickQuoteMsg" style="opacity:.85;"></small>
-                </form>
-            </div>
-        </section>
 
         <!-- Added Info Section -->
         <section class="section" id="more-info" style="background:#ffffff; color:#0f172a;">
