@@ -53,6 +53,16 @@
 
 <body>
 
+    <!-- Hero Header Bar -->
+    <header class="site-hero-bar" style="position:sticky; top:0; z-index:50; background:linear-gradient(135deg,#0f2f57,#1a4b84); color:#fff; padding:.75rem 1rem; display:flex; justify-content:space-between; align-items:center; box-shadow:0 6px 18px rgba(0,0,0,.22)">
+        <strong>Big D’s Tree Service</strong>
+        <nav style="display:flex; gap:.75rem; align-items:center; font-size:.95rem;">
+            <a href="#hero" style="color:#fff; text-decoration:none;">Home</a>
+            <a href="#quick-quote" style="color:#fff; text-decoration:none;">Quick Quote</a>
+            <a href="tel:2622150497" style="color:#fff; text-decoration:none; font-weight:700;">(262) 215-0497</a>
+        </nav>
+    </header>
+
     <!-- Hero Section -->
     <header class="hero" id="hero">
         <!-- Background Layer -->
@@ -77,7 +87,7 @@
             <form class="hero-form" onsubmit="event.preventDefault(); handleHeroSubmit();">
                 <div class="input-group">
                     <input type="text" id="concernInput"
-                        placeholder="Tell us about your tree—leaning branch? Storm concern?"
+                        placeholder="Type Tree, Stump or Branches"
                         aria-label="Describe your tree concern" required>
                     <button type="submit" class="btn-primary">Get Started</button>
                 </div>
@@ -209,6 +219,24 @@
                 <a href="tel:2622150497" class="btn-large">Call (262) 215-0497</a>
             </div>
         </section>
+
+        <!-- Old-School Quick Quote Form -->
+        <section class="section" id="quick-quote">
+            <div class="container" style="max-width:760px;">
+                <h2 style="margin-bottom:.5rem;">Quick Quote Request</h2>
+                <p style="margin-bottom:1rem; opacity:.9;">Simple form. Add photos. We email the owner directly.</p>
+                <form id="quickQuoteForm" style="display:grid; gap:.75rem; background:#fff; padding:1rem; border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,.1);">
+                    <input name="name" required placeholder="Name" style="padding:.75rem; border:1px solid #cbd5e1; border-radius:8px;">
+                    <input name="phone" required placeholder="Phone Number" style="padding:.75rem; border:1px solid #cbd5e1; border-radius:8px;">
+                    <input type="email" name="email" placeholder="Email" style="padding:.75rem; border:1px solid #cbd5e1; border-radius:8px;">
+                    <input name="address" placeholder="Address" style="padding:.75rem; border:1px solid #cbd5e1; border-radius:8px;">
+                    <textarea name="details" required placeholder="What are your tree care and preservation needs?" style="min-height:120px; padding:.75rem; border:1px solid #cbd5e1; border-radius:8px;"></textarea>
+                    <input type="file" name="photos" id="quickQuotePhotos" multiple accept="image/*">
+                    <button type="submit" class="btn-primary" id="quickQuoteBtn">Send Request</button>
+                    <small id="quickQuoteMsg" style="opacity:.85;"></small>
+                </form>
+            </div>
+        </section>
     </main>
 
     <footer class="footer">
@@ -219,6 +247,31 @@
     </footer>
 
     <script src="env.js"></script>
+    <script>
+      (function(){
+        const form = document.getElementById('quickQuoteForm');
+        if(!form) return;
+        const btn = document.getElementById('quickQuoteBtn');
+        const msg = document.getElementById('quickQuoteMsg');
+        form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          btn.disabled = true;
+          msg.textContent = 'Sending...';
+          const fd = new FormData(form);
+          try {
+            const API_BASE = (window.ENV && window.ENV.API_BASE) || 'http://localhost:3001';
+            const res = await fetch(`${API_BASE}/api/quote`, { method:'POST', body: fd });
+            if(!res.ok) throw new Error('Request failed');
+            form.reset();
+            msg.textContent = '✅ Request sent. We will reach out shortly.';
+          } catch (err) {
+            msg.textContent = '❌ Could not send. Please call (262) 215-0497.';
+          } finally {
+            btn.disabled = false;
+          }
+        });
+      })();
+    </script>
     <script type="module" src="frontend/script.js"></script>
 </body>
 
