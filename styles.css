@@ -79,13 +79,15 @@ a {
 
 /* Hero Section */
 .hero {
-    height: 88dvh;
+    height: 62dvh;
+    min-height: 420px;
     width: 100%;
     position: relative;
     overflow: hidden;
     display: flex;
-    align-items: center;
+    align-items: flex-end;
     justify-content: center;
+    padding-bottom: 1rem;
 }
 
 .hero-bg {
@@ -403,7 +405,7 @@ a {
 
 /* Sections */
 .section {
-    padding: 3.5rem 0;
+    padding: 2rem 0;
     min-height: auto;
     display: flex;
     flex-direction: column;
@@ -424,12 +426,12 @@ a {
 
 /* Make dream section more compact */
 .dream {
-    padding: 2rem 0;
+    padding: 1.5rem 0;
 }
 
 .dream .section-title {
-    font-size: 2rem;
-    margin-bottom: 0.75rem;
+    font-size: 1.75rem;
+    margin-bottom: 0.5rem;
 }
 
 /* Services Grid */
