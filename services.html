@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Services | Big D's Tree Service</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body style="background:#f8fafc; color:#0f172a;">
+  <header class="site-hero-bar" style="position:sticky; top:0; z-index:50; background:linear-gradient(135deg,#0f2f57,#1a4b84); color:#fff; padding:.75rem 1rem; display:flex; justify-content:space-between; align-items:center; box-shadow:0 6px 18px rgba(0,0,0,.22)">
+    <strong>Big D’s Tree Service</strong>
+    <nav style="display:flex; gap:.75rem; align-items:center; font-size:.95rem;">
+      <a href="index.html" style="color:#fff; text-decoration:none;">Home</a>
+      <a href="services.html" style="color:#fff; text-decoration:none;">Services</a>
+      <a href="tel:2622150497" style="color:#fff; text-decoration:none; font-weight:700;">(262) 215-0497</a>
+    </nav>
+  </header>
+
+  <main class="container" style="max-width:900px; padding:2rem 1rem 3rem;">
+    <h1 style="margin-bottom:.75rem;">Our Services</h1>
+    <p style="margin-bottom:1rem;">Professional tree care across Rock, Walworth, Jefferson, Dane, and Racine counties.</p>
+
+    <section style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:1rem 1.25rem; margin-bottom:1.25rem;">
+      <ul style="margin-left:1rem; line-height:1.9;">
+        <li>Emergency 24 hour storm damage</li>
+        <li>Stump grinding</li>
+        <li>Storm Clean up</li>
+        <li>Tree Removal</li>
+        <li>Tree pruning</li>
+        <li>Land clearing</li>
+        <li>Tree Planting</li>
+      </ul>
+    </section>
+
+    <section style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:1rem 1.25rem;">
+      <h2 style="margin-bottom:.75rem;">Quote Form</h2>
+      <form id="servicesQuoteForm" style="display:grid; gap:.75rem;">
+        <input name="name" required placeholder="Name" style="padding:.75rem; border:1px solid #cbd5e1; border-radius:8px;" />
+        <input name="phone" required placeholder="Number" style="padding:.75rem; border:1px solid #cbd5e1; border-radius:8px;" />
+        <input type="email" name="email" placeholder="Email" style="padding:.75rem; border:1px solid #cbd5e1; border-radius:8px;" />
+        <input name="address" placeholder="Address" style="padding:.75rem; border:1px solid #cbd5e1; border-radius:8px;" />
+        <textarea name="details" required placeholder="What are your tree care and preservation needs?" style="min-height:120px; padding:.75rem; border:1px solid #cbd5e1; border-radius:8px;"></textarea>
+        <button type="submit" class="btn-primary" id="servicesQuoteBtn">Send Request</button>
+        <small id="servicesQuoteMsg" style="opacity:.85;"></small>
+      </form>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <p class="nap">Big D's Tree Service, Janesville, WI 53545 | (262) 215-0497 | shipithon@gmail.com</p>
+      <p class="areas">Serving Janesville, Rock County, Walworth, Jefferson, Dane, Racine</p>
+    </div>
+  </footer>
+
+  <script src="env.js"></script>
+  <script>
+    (function(){
+      const form = document.getElementById('servicesQuoteForm');
+      const btn = document.getElementById('servicesQuoteBtn');
+      const msg = document.getElementById('servicesQuoteMsg');
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        btn.disabled = true;
+        msg.textContent = 'Sending...';
+        const fd = new FormData(form);
+        try {
+          const API_BASE = (window.ENV && window.ENV.API_BASE) || 'http://localhost:3001';
+          const res = await fetch(`${API_BASE}/api/quote`, { method:'POST', body: fd });
+          if(!res.ok) throw new Error('Request failed');
+          form.reset();
+          msg.textContent = '✅ Request sent. We will reach out shortly.';
+        } catch (_) {
+          msg.textContent = '❌ Could not send. Please call (262) 215-0497.';
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
