@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Get a Free Quote | Big D's Tree Service</title>
+    <meta name="description" content="Request a free tree service quote from Big D's Tree Service in Janesville, WI. Fast response for tree removal, pruning, stump grinding & emergency services.">
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .quote-page {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #1a365d 0%, #2d4a6f 50%, #1a365d 100%);
+            padding: 2rem 1rem;
+        }
+        
+        .quote-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .quote-header {
+            background: linear-gradient(135deg, #c53030 0%, #9b2c2c 100%);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+        
+        .quote-header h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.8rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .quote-header p {
+            opacity: 0.9;
+            font-size: 1rem;
+        }
+        
+        .quote-form {
+            padding: 2rem;
+        }
+        
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: #1a365d;
+        }
+        
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 0.875rem 1rem;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-family: inherit;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #3182ce;
+            box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.1);
+        }
+        
+        .form-group textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+        
+        .photo-upload {
+            border: 2px dashed #cbd5e0;
+            border-radius: 8px;
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: #f7fafc;
+        }
+        
+        .photo-upload:hover {
+            border-color: #3182ce;
+            background: #ebf8ff;
+        }
+        
+        .photo-upload.dragover {
+            border-color: #3182ce;
+            background: #ebf8ff;
+        }
+        
+        .photo-upload-icon {
+            font-size: 3rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .photo-upload p {
+            color: #718096;
+            margin: 0;
+        }
+        
+        .photo-upload input {
+            display: none;
+        }
+        
+        .photo-previews {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+        
+        .photo-preview {
+            position: relative;
+            width: 80px;
+            height: 80px;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .photo-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .photo-preview .remove-photo {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            width: 20px;
+            height: 20px;
+            background: #c53030;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 12px;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .submit-btn {
+            width: 100%;
+            padding: 1rem 2rem;
+            background: linear-gradient(135deg, #c53030 0%, #9b2c2c 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(197, 48, 48, 0.4);
+        }
+        
+        .submit-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .back-link {
+            display: block;
+            text-align: center;
+            margin-top: 1.5rem;
+            color: #3182ce;
+            text-decoration: none;
+        }
+        
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        
+        .success-message {
+            display: none;
+            text-align: center;
+            padding: 3rem 2rem;
+        }
+        
+        .success-message.show {
+            display: block;
+        }
+        
+        .success-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+        }
+        
+        .success-message h2 {
+            color: #276749;
+            margin-bottom: 0.5rem;
+        }
+        
+        .success-message p {
+            color: #4a5568;
+        }
+        
+        .phone-link {
+            display: inline-block;
+            margin-top: 1rem;
+            padding: 0.75rem 1.5rem;
+            background: #1a365d;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+        }
+        
+        .service-select {
+            margin-bottom: 1.5rem;
+        }
+        
+        .discount-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid #e2e8f0;
+        }
+        
+        .discount-badge {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            background: #ebf8ff;
+            color: #2b6cb0;
+            border-radius: 4px;
+        }
+        
+        @media (max-width: 480px) {
+            .quote-form {
+                padding: 1.5rem;
+            }
+            
+            .quote-header {
+                padding: 1.5rem;
+            }
+            
+            .quote-header h1 {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="quote-page">
+        <div class="quote-container">
+            <div class="quote-header">
+                <h1>🌳 Free Quote Request</h1>
+                <p>Big D's Tree Service • (262) 215-0497</p>
+            </div>
+            
+            <form class="quote-form" id="quoteForm">
+                <div class="form-group">
+                    <label for="name">Your Name *</label>
+                    <input type="text" id="name" name="name" required placeholder="John Smith">
+                </div>
+                
+                <div class="form-group">
+                    <label for="phone">Phone Number *</label>
+                    <input type="tel" id="phone" name="phone" required placeholder="(262) 555-1234">
+                </div>
+                
+                <div class="form-group">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" name="email" placeholder="john@example.com">
+                </div>
+                
+                <div class="form-group">
+                    <label for="address">Property Address</label>
+                    <input type="text" id="address" name="address" placeholder="123 Main St, Janesville, WI">
+                </div>
+                
+                <div class="form-group service-select">
+                    <label for="service">Service Needed</label>
+                    <select id="service" name="service">
+                        <option value="">Select a service...</option>
+                        <option value="tree_removal">Tree Removal</option>
+                        <option value="tree_trimming">Tree Pruning/Trimming</option>
+                        <option value="stump_grinding">Stump Grinding</option>
+                        <option value="emergency_storm">Emergency/Storm Damage</option>
+                        <option value="land_clearing">Land Clearing</option>
+                        <option value="tree_planting">Tree Planting</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="details">Tell us about your tree care needs *</label>
+                    <textarea id="details" name="details" required 
+                        placeholder="Describe the trees, location, any concerns or urgency..."></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label>Add Photos (optional)</label>
+                    <div class="photo-upload" id="photoUpload">
+                        <div class="photo-upload-icon">📷</div>
+                        <p>Click or drag photos here</p>
+                        <p style="font-size: 0.8rem; margin-top: 0.5rem;">Full tree, trunk/base, nearby structures</p>
+                        <input type="file" id="photoInput" multiple accept="image/*">
+                    </div>
+                    <div class="photo-previews" id="photoPreviews"></div>
+                </div>
+                
+                <button type="submit" class="submit-btn" id="submitBtn">
+                    Send Quote Request
+                </button>
+                
+                <div class="discount-badges">
+                    <span class="discount-badge">🎖️ Veteran Discount</span>
+                    <span class="discount-badge">🚒 First Responder Discount</span>
+                    <span class="discount-badge">⚕️ Healthcare Worker Discount</span>
+                    <span class="discount-badge">🔄 Repeat Client Discount</span>
+                </div>
+                
+                <a href="index.html" class="back-link">← Back to Home</a>
+            </form>
+            
+            <div class="success-message" id="successMessage">
+                <div class="success-icon">✅</div>
+                <h2>Request Received!</h2>
+                <p>We'll review your request and get back to you within 24 hours.</p>
+                <p>For immediate assistance, call us:</p>
+                <a href="tel:2622150497" class="phone-link">📞 (262) 215-0497</a>
+                <a href="index.html" class="back-link">← Back to Home</a>
+            </div>
+        </div>
+    </div>
+    
+    <script src="env.js"></script>
+    <script>
+        const photoInput = document.getElementById('photoInput');
+        const photoUpload = document.getElementById('photoUpload');
+        const photoPreviews = document.getElementById('photoPreviews');
+        const quoteForm = document.getElementById('quoteForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const successMessage = document.getElementById('successMessage');
+        
+        let selectedFiles = [];
+        
+        // Photo upload handling
+        photoUpload.addEventListener('click', () => photoInput.click());
+        
+        photoUpload.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            photoUpload.classList.add('dragover');
+        });
+        
+        photoUpload.addEventListener('dragleave', () => {
+            photoUpload.classList.remove('dragover');
+        });
+        
+        photoUpload.addEventListener('drop', (e) => {
+            e.preventDefault();
+            photoUpload.classList.remove('dragover');
+            handleFiles(e.dataTransfer.files);
+        });
+        
+        photoInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+        });
+        
+        function handleFiles(files) {
+            for (const file of files) {
+                if (file.type.startsWith('image/') && selectedFiles.length < 5) {
+                    selectedFiles.push(file);
+                    addPreview(file);
+                }
+            }
+        }
+        
+        function addPreview(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const div = document.createElement('div');
+                div.className = 'photo-preview';
+                div.innerHTML = `
+                    <img src="${e.target.result}" alt="Preview">
+                    <button type="button" class="remove-photo" onclick="removePhoto(this, '${file.name}')">&times;</button>
+                `;
+                photoPreviews.appendChild(div);
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        function removePhoto(btn, filename) {
+            selectedFiles = selectedFiles.filter(f => f.name !== filename);
+            btn.parentElement.remove();
+        }
+        
+        // Form submission
+        quoteForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Sending...';
+            
+            const formData = new FormData();
+            formData.append('name', document.getElementById('name').value);
+            formData.append('phone', document.getElementById('phone').value);
+            formData.append('email', document.getElementById('email').value || '');
+            formData.append('address', document.getElementById('address').value || '');
+            formData.append('service', document.getElementById('service').value || '');
+            formData.append('details', document.getElementById('details').value);
+            
+            // Add photos
+            selectedFiles.forEach((file, i) => {
+                formData.append('photos', file);
+            });
+            
+            try {
+                const API_BASE = window.ENV?.API_BASE || 'http://localhost:3001';
+                const response = await fetch(`${API_BASE}/api/quote`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    quoteForm.style.display = 'none';
+                    successMessage.classList.add('show');
+                } else {
+                    throw new Error('Failed to submit');
+                }
+            } catch (err) {
+                console.error('Submit error:', err);
+                alert('There was an error submitting your request. Please call us at (262) 215-0497');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Send Quote Request';
+            }
+        });
+    </script>
+</body>
+</html>
