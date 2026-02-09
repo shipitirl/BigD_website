@@ -417,9 +417,19 @@ a {
 }
 
 .poetic-text {
-    font-size: 1.8rem;
-    max-width: 800px;
+    font-size: 1.2rem;
+    max-width: 700px;
     color: var(--text-muted);
+}
+
+/* Make dream section more compact */
+.dream {
+    padding: 2rem 0;
+}
+
+.dream .section-title {
+    font-size: 2rem;
+    margin-bottom: 0.75rem;
 }
 
 /* Services Grid */
