@@ -28,5 +28,5 @@ node_modules/
 .idea/
 .vscode/
 *.swp
-env.js
+# env.js is tracked for runtime config
 .vercel
