@@ -313,7 +313,7 @@ export async function runChatTurn(state: SessionState, userMessage: string) {
     console.log(`[LLM] Sending ${truncatedMessages.length} messages (truncated from ${state.messages.length})`);
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini", // GPT-4o-mini for better extraction while keeping costs lower
+      model: "gpt-5.1", // switched per request
       messages: [
         { role: "system", content: systemPrompt },
         ...truncatedMessages.map(m => ({ role: m.role as "user" | "assistant", content: m.content })),
@@ -548,7 +548,7 @@ export async function* streamChatTurn(
   try {
     // Use actual OpenAI streaming
     const stream = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-5.1",
       messages: [
         { role: "system", content: systemPrompt },
         ...truncatedMessages.map(m => ({ role: m.role as "user" | "assistant", content: m.content })),
