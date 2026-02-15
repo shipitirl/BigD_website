@@ -8,7 +8,8 @@ import type { SessionState } from "./session";
 import type { Lead } from "./lead";
 import { ensureLeadSchema } from "./lead-migration";
 
-const SESSIONS_DIR = path.join(process.cwd(), ".sessions");
+const IS_SERVERLESS = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+const SESSIONS_DIR = process.env.SESSIONS_DIR || (IS_SERVERLESS ? "/tmp/.sessions" : path.join(process.cwd(), ".sessions"));
 
 // Ensure sessions directory exists
 (async () => {
