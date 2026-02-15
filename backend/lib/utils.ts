@@ -4,6 +4,7 @@ import crypto from "crypto";
 import fs from "fs/promises";
 import path from "path";
 import { format } from "date-fns";
+import { createClient } from "@supabase/supabase-js";
 import type { SessionState } from "./session";
 import type { Lead } from "./lead";
 import { ensureLeadSchema } from "./lead-migration";
@@ -161,9 +162,98 @@ const postgresAdapter: StorageAdapter = {
 };
 
 // ----------------------
+// SUPABASE STORAGE
+// ----------------------
+let supabaseClient: any = null;
+
+function getSupabaseClient() {
+  if (supabaseClient) return supabaseClient;
+  
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+  
+  if (!supabaseUrl || !supabaseKey) return null;
+  
+  try {
+    supabaseClient = createClient(supabaseUrl, supabaseKey, {
+      auth: { persistSession: false }
+    });
+    console.log("[Storage] Supabase client initialized");
+    return supabaseClient;
+  } catch (err) {
+    console.warn("[Storage] Supabase init failed:", err);
+    return null;
+  }
+}
+
+const supabaseAdapter: StorageAdapter = {
+  async load<T>(key: string): Promise<T | null> {
+    const client = getSupabaseClient();
+    if (!client) return fileAdapter.load(key);
+    
+    try {
+      const { data, error } = await client
+        .from("sessions")
+        .select("data")
+        .eq("session_id", key)
+        .single();
+      
+      if (error || !data) return null;
+      return data.data as T;
+    } catch (err) {
+      console.error("[Storage] Supabase load error:", err);
+      return fileAdapter.load(key);
+    }
+  },
+
+  async save<T>(key: string, data: T): Promise<void> {
+    const client = getSupabaseClient();
+    if (!client) {
+      await fileAdapter.save(key, data);
+      return;
+    }
+    
+    try {
+      await client
+        .from("sessions")
+        .upsert({ 
+          session_id: key, 
+          data: data as any,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'session_id' });
+    } catch (err) {
+      console.error("[Storage] Supabase save error:", err);
+      await fileAdapter.save(key, data);
+    }
+  },
+
+  async delete(key: string): Promise<void> {
+    const client = getSupabaseClient();
+    if (!client) {
+      await fileAdapter.delete(key);
+      return;
+    }
+    
+    try {
+      await client
+        .from("sessions")
+        .delete()
+        .eq("session_id", key);
+    } catch (err) {
+      console.error("[Storage] Supabase delete error:", err);
+      await fileAdapter.delete(key);
+    }
+  },
+};
+
+// ----------------------
 // STORAGE API (Auto-selects adapter)
 // ----------------------
 async function getAdapter(): Promise<StorageAdapter> {
+  // Priority: Supabase > PostgreSQL > File
+  const supabase = getSupabaseClient();
+  if (supabase) return supabaseAdapter;
+  
   if (process.env.DATABASE_URL) {
     const pool = await getPostgresPool();
     if (pool) return postgresAdapter;
