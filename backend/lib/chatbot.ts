@@ -416,16 +416,23 @@ export async function runChatTurn(state: SessionState, userMessage: string) {
 
     console.log(`[LLM] Sending ${truncatedMessages.length} messages (truncated from ${state.messages.length})`);
 
-    const completion = await llmClient.chat.completions.create({
-      model: llmModel,
-      messages: [
-        { role: "system", content: systemPrompt },
-        ...truncatedMessages.map(m => ({ role: m.role as "user" | "assistant", content: m.content })),
-      ],
-      response_format: { type: "json_object" },
+    let completion;
+    try {
+      completion = await llmClient.chat.completions.create({
+        model: llmModel,
+        messages: [
+          { role: "system", content: systemPrompt },
+          ...truncatedMessages.map(m => ({ role: m.role as "user" | "assistant", content: m.content })),
+        ],
+        response_format: { type: "json_object" },
 
-      max_completion_tokens: 1500, // More room for detailed responses
-    });
+        max_completion_tokens: 1500, // More room for detailed responses
+      });
+    } catch (llmErr: any) {
+      console.error("[LLM] Call failed:", llmErr?.message || llmErr);
+      console.error("[LLM] Call failed details:", JSON.stringify(llmErr?.response?.data || llmErr));
+      throw llmErr;
+    }
 
     const rawContent = completion.choices[0]?.message?.content || "";
     const finishReason = completion.choices[0]?.finish_reason;
