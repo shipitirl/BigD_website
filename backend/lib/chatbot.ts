@@ -394,6 +394,7 @@ function applyManualExtraction(state: SessionState, u: any): void {
 // MAIN CHAT TURN (LLM)
 // ----------------------
 export async function runChatTurn(state: SessionState, userMessage: string) {
+  console.log("[runChatTurn] START - provider:", llmProvider, "model:", llmModel);
   // Update timestamp
   state.updated_at = new Date().toISOString();
   state.messages.push({ role: "user", content: userMessage });
