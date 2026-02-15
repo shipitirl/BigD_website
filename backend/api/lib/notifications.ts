@@ -1,7 +1,7 @@
 // backend/api/lib/notifications.ts
 
 import nodemailer from "nodemailer";
-import type { SessionState, Estimate } from "./types";
+import type { SessionState, Estimate } from "./session";
 import { formatPhone } from "./utils";
 
 // ----------------------
@@ -25,10 +25,16 @@ const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
 // ----------------------
 const serviceLabels: Record<string, string> = {
   tree_removal: "Tree Removal",
+  tree_trimming: "Tree Trimming",
   stump_grinding: "Stump Grinding",
-  trimming: "Trimming/Pruning",
-  storm_cleanup: "Storm Cleanup",
-  unknown: "Tree Service",
+  storm_prep: "Storm Preparation",
+  emergency_storm: "Emergency Storm Cleanup",
+  land_clearing: "Land Clearing",
+  tree_health: "Tree Health",
+  pest_management: "Pest Management",
+  disease_management: "Disease Management",
+  consulting: "Consulting",
+  other: "Tree Service",
 };
 
 // ----------------------
@@ -119,14 +125,15 @@ async function sendSMS(to: string, body: string): Promise<boolean> {
 function buildOwnerEmailHtml(session: SessionState): string {
   const estimate = session.estimate;
   const contact = session.contact;
-  const serviceType = serviceLabels[session.serviceType || "unknown"];
+  const serviceType = serviceLabels[session.service_type || "other"];
 
   const estimateRange = estimate
     ? `$${estimate.min.toLocaleString()} - $${estimate.max.toLocaleString()}`
     : "Pending review";
 
-  const photosHtml = session.photoUrls.length > 0
-    ? session.photoUrls.map(url =>
+  const photoUrls = session.photos?.urls || [];
+  const photosHtml = photoUrls.length > 0
+    ? photoUrls.map(url =>
         `<a href="${APP_URL}${url}" target="_blank"><img src="${APP_URL}${url}" width="150" style="margin: 4px; border-radius: 8px;"></a>`
       ).join("")
     : "<p>No photos uploaded</p>";
@@ -180,9 +187,11 @@ function buildOwnerEmailHtml(session: SessionState): string {
 
     <div class="section">
       <div class="label">Service Details</div>
-      <p><strong>${serviceType}</strong> — ${session.treeCount || 1} tree(s)/stump(s)</p>
-      <p>Access: ${session.access || "Not specified"}</p>
-      <p>${session.hasPowerLines ? "⚡ Power lines nearby" : "✓ No power lines"}</p>
+      <p><strong>${serviceType}</strong> — ${session.tree_count || 1} tree(s)/stump(s)</p>
+      <p>Location: ${session.access.location || "Not specified"}</p>
+      <p>Slope: ${session.access.slope || "Not specified"}</p>
+      <p>${session.hazards.power_lines ? "⚡ Power lines nearby" : "✓ No power lines"}</p>
+      <p>${session.hazards.structures_nearby ? "🏠 Near structures" : "✓ Open area"}</p>
     </div>
 
     <div class="section">
@@ -195,12 +204,14 @@ function buildOwnerEmailHtml(session: SessionState): string {
       <p>
         <strong>${contact.name || "Unknown"}</strong><br>
         📞 <a href="tel:${contact.phone}">${contact.phone || "No phone"}</a><br>
-        ${contact.email ? `✉️ ${contact.email}` : ""}
+        ${contact.email ? `✉️ ${contact.email}<br>` : ""}
+        ${contact.address ? `📍 ${contact.address}<br>` : ""}
+        ${contact.city ? `${contact.city}, ` : ""}${session.zip || ""}
       </p>
     </div>
 
     <div class="section">
-      <div class="label">Photos (${session.photoUrls.length})</div>
+      <div class="label">Photos (${photoUrls.length})</div>
       <div class="photos">${photosHtml}</div>
     </div>
 
@@ -222,11 +233,13 @@ function buildOwnerEmailHtml(session: SessionState): string {
 function buildOwnerEmailText(session: SessionState): string {
   const estimate = session.estimate;
   const contact = session.contact;
-  const serviceType = serviceLabels[session.serviceType || "unknown"];
+  const serviceType = serviceLabels[session.service_type || "other"];
 
   const estimateRange = estimate
     ? `$${estimate.min.toLocaleString()} - $${estimate.max.toLocaleString()}`
     : "Pending review";
+
+  const photoUrls = session.photos?.urls || [];
 
   return `
 New Estimate Request - Big D's Tree Service
@@ -234,7 +247,7 @@ New Estimate Request - Big D's Tree Service
 
 ${session.urgency === "emergency" ? "⚠️ EMERGENCY REQUEST\n" : ""}
 Service: ${serviceType}
-Count: ${session.treeCount || 1}
+Count: ${session.tree_count || 1}
 ZIP: ${session.zip || "Unknown"}
 
 ESTIMATE: ${estimateRange} (${estimate?.confidence || "low"} confidence)
@@ -244,13 +257,17 @@ CUSTOMER:
   Name: ${contact.name || "Unknown"}
   Phone: ${contact.phone || "No phone"}
   Email: ${contact.email || "No email"}
+  Address: ${contact.address || "Not provided"}
+  City: ${contact.city || "Not provided"}, ${session.zip || ""}
 
-ACCESS: ${session.access || "Not specified"}
-POWER LINES: ${session.hasPowerLines ? "YES" : "No"}
+LOCATION: ${session.access.location || "Not specified"}
+SLOPE: ${session.access.slope || "Not specified"}
+POWER LINES: ${session.hazards.power_lines ? "YES" : "No"}
+NEAR STRUCTURES: ${session.hazards.structures_nearby ? "YES" : "No"}
 
-PHOTOS (${session.photoUrls.length}):
-${session.photoUrls.length > 0
-    ? session.photoUrls.map(url => `  ${APP_URL}${url}`).join("\n")
+PHOTOS (${photoUrls.length}):
+${photoUrls.length > 0
+    ? photoUrls.map(url => `  ${APP_URL}${url}`).join("\n")
     : "  No photos uploaded"}
   `.trim();
 }
@@ -259,7 +276,7 @@ ${session.photoUrls.length > 0
 // NOTIFY OWNER (Email)
 // ----------------------
 export async function notifyOwnerEmail(session: SessionState): Promise<boolean> {
-  const serviceType = serviceLabels[session.serviceType || "unknown"];
+  const serviceType = serviceLabels[session.service_type || "other"];
   const estimate = session.estimate;
   const estimateRange = estimate
     ? `$${estimate.min.toLocaleString()} - $${estimate.max.toLocaleString()}`
@@ -284,14 +301,14 @@ export async function notifyOwnerSMS(session: SessionState): Promise<boolean> {
     return true;
   }
 
-  const serviceType = serviceLabels[session.serviceType || "unknown"];
+  const serviceType = serviceLabels[session.service_type || "other"];
   const estimate = session.estimate;
   const estimateRange = estimate
     ? `$${estimate.min} - $${estimate.max}`
     : "TBD";
 
   const body = `🌳 New lead: ${serviceType}\n` +
-    `${session.zip || "No ZIP"} | ${session.treeCount || 1} tree(s)\n` +
+    `${session.zip || "No ZIP"} | ${session.tree_count || 1} tree(s)\n` +
     `Est: ${estimateRange}\n` +
     `Customer: ${session.contact.name || "?"} ${session.contact.phone || ""}\n` +
     `${session.urgency === "emergency" ? "🚨 EMERGENCY" : ""}`;
@@ -314,7 +331,7 @@ export async function sendEstimateToCustomer(session: SessionState): Promise<boo
     return false;
   }
 
-  const serviceType = serviceLabels[session.serviceType || "unknown"];
+  const serviceType = serviceLabels[session.service_type || "other"];
 
   const body = `Big D's Tree Service estimate:\n\n` +
     `$${estimate.min.toLocaleString()} - $${estimate.max.toLocaleString()} for ${serviceType}\n\n` +

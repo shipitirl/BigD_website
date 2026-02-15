@@ -2,10 +2,23 @@
 
 import { NextResponse } from "next/server";
 import { ChatRequestSchema, runChatTurn, streamChatTurn, createNewSession } from "@/api/lib/chatbot";
-import type { ChatRequestBody, ChatResponseBody, SessionState } from "@/api/lib/types";
+import type { ChatRequestBody, ChatResponseBody } from "@/api/lib/types";
+import type { SessionState } from "@/api/lib/session";
 import { generateSessionId, loadSession, saveSession } from "@/api/lib/utils";
+import { setCloudflareEnv, type CloudflareEnv } from "@/api/lib/storage-cloudflare";
 
 export async function POST(req: Request) {
+  // Try to get Cloudflare env from request context (@cloudflare/next-on-pages)
+  try {
+    const { getRequestContext } = await import("@cloudflare/next-on-pages");
+    const ctx = getRequestContext();
+    if (ctx?.env) {
+      setCloudflareEnv(ctx.env as CloudflareEnv);
+    }
+  } catch {
+    // Not in Cloudflare environment - will use local storage
+  }
+
   let json: ChatRequestBody;
 
   try {
@@ -58,21 +71,21 @@ export async function POST(req: Request) {
           // Save the updated state
           await saveSession(sessionId, state);
 
-          // Send final metadata
+          // Send final metadata (NO estimate - that's owner-only)
           controller.enqueue(
             encoder.encode(
               `data: ${JSON.stringify({
                 type: "done",
                 sessionId,
                 readyForPhotos: state.status === "awaiting_photos",
-                estimate: state.estimate,
+                // estimate intentionally NOT sent to customer
                 collected: {
                   zip: state.zip,
-                  serviceType: state.serviceType,
-                  treeCount: state.treeCount,
-                  access: state.access,
-                  hasPowerLines: state.hasPowerLines,
-                  hasPhotos: state.hasPhotos,
+                  serviceType: state.service_type,
+                  treeCount: state.tree_count,
+                  access: state.access.location,
+                  hasPowerLines: state.hazards.power_lines,
+                  hasPhotos: state.photos_uploaded,
                 },
               })}\n\n`
             )
@@ -102,20 +115,23 @@ export async function POST(req: Request) {
   const result = await runChatTurn(state, message);
   await saveSession(sessionId, result.updatedState);
 
-  const response: ChatResponseBody = {
+  // NOTE: Estimate is NOT sent to customer - it's owner-only (sent via email on finalize)
+  const response: ChatResponseBody & { state: typeof result.updatedState } = {
     sessionId,
     assistantMessage: result.assistantMessage,
     nextQuestions: result.nextQuestions,
     readyForPhotos: result.readyForPhotos,
-    estimate: result.estimate,
+    // estimate intentionally NOT included - owner-only via email
     collected: {
-      zip: result.updatedState.zip,
-      serviceType: result.updatedState.serviceType,
-      treeCount: result.updatedState.treeCount,
-      access: result.updatedState.access,
-      hasPowerLines: result.updatedState.hasPowerLines,
-      hasPhotos: result.updatedState.hasPhotos,
+      zip: result.updatedState.zip ?? undefined,
+      serviceType: result.updatedState.service_type ?? undefined,
+      treeCount: result.updatedState.tree_count ?? undefined,
+      access: result.updatedState.access.location ?? undefined,
+      hasPowerLines: result.updatedState.hazards.power_lines ?? undefined,
+      hasPhotos: result.updatedState.photos_uploaded,
     },
+    // Full state for debugging/testing (includes internal estimate)
+    state: result.updatedState,
   };
 
   return NextResponse.json(response, {

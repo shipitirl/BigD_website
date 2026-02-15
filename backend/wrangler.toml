@@ -1,0 +1,54 @@
+# Cloudflare Pages Configuration
+# See: https://developers.cloudflare.com/pages/functions/wrangler-configuration/
+
+name = "bigd-tree-service"
+compatibility_date = "2024-01-01"
+
+# -------------------------
+# D1 Database Binding
+# -------------------------
+# Create the database first:
+#   wrangler d1 create bigd-leads
+# Then update the database_id below with the ID from the output
+[[d1_databases]]
+binding = "DB"
+database_name = "bigd-leads"
+database_id = "<YOUR_D1_DATABASE_ID>"
+
+# -------------------------
+# R2 Object Storage Binding
+# -------------------------
+# Create the bucket first:
+#   wrangler r2 bucket create bigd-photos
+[[r2_buckets]]
+binding = "PHOTOS"
+bucket_name = "bigd-photos"
+
+# -------------------------
+# Environment Variables
+# -------------------------
+# Set these in the Cloudflare Pages dashboard under Settings > Environment Variables
+# 
+# Required:
+#   OPENAI_API_KEY - Your OpenAI API key
+#   ADMIN_TOKEN_SECRET - Secret for signing admin JWT tokens
+#   APP_URL - Your production URL (e.g., https://bigdtrees.com)
+#
+# Optional:
+#   OWNER_EMAIL - Email to receive lead notifications
+#   OWNER_PHONE - Phone to receive SMS notifications (Twilio)
+#   GMAIL_USER - Gmail address for sending emails
+#   GMAIL_APP_PASSWORD - Gmail app password
+#   TWILIO_ACCOUNT_SID - Twilio account SID
+#   TWILIO_AUTH_TOKEN - Twilio auth token
+#   TWILIO_PHONE_NUMBER - Twilio phone number
+#   HUBSPOT_ACCESS_TOKEN - HubSpot private app token for CRM sync
+#   ADMIN_API_KEY - API key for admin endpoints (leads list, stats)
+
+# -------------------------
+# Note on @cloudflare/next-on-pages
+# -------------------------
+# This project uses @cloudflare/next-on-pages for deployment.
+# Install it with: npm install -D @cloudflare/next-on-pages
+# Build with: npx @cloudflare/next-on-pages
+# Deploy with: wrangler pages deploy .vercel/output/static

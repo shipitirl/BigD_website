@@ -7,7 +7,7 @@
 - [ ] `.env` file is NOT committed to git (check `.gitignore`)
 - [ ] `OPENAI_API_KEY` is set and NOT exposed to frontend
 - [ ] `ADMIN_TOKEN_SECRET` is set to a strong random value (not `dev-secret-change-in-production`)
-- [ ] `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN` are set (or removed if using mock mode)
+- [ ] `ZAPIER_LEAD_WEBHOOK_URL` is set (recommended for lead intake automation)
 - [ ] `OWNER_EMAIL` is set to correct email address
 - [ ] `APP_URL` is set to production URL (e.g., `https://bigdtrees.com`)
 
@@ -53,6 +53,18 @@ ADMIN_TOKEN_SECRET=random-32-char-key    # JWT signing secret
 TWILIO_ACCOUNT_SID=AC...
 TWILIO_AUTH_TOKEN=...
 TWILIO_PHONE_NUMBER=+1234567890
+
+# Zapier-first lead flow
+ZAPIER_LEAD_WEBHOOK_URL=https://hooks.zapier.com/hooks/catch/...
+ENABLE_ZAPIER_LEAD_FLOW=true
+ENABLE_NATIVE_NOTIFICATIONS=false   # prevent duplicate SMS/email when Zapier sends them
+ENABLE_HUBSPOT_SYNC=false           # CRM sync optional, disabled by default
+ZAPIER_TIMEOUT_MS=10000
+
+# Optional Zapier event endpoints
+ZAPIER_MISSED_CALL_WEBHOOK_URL=https://hooks.zapier.com/hooks/catch/...
+ZAPIER_REVIEW_WEBHOOK_URL=https://hooks.zapier.com/hooks/catch/...
+ZAPIER_EVENTS_API_KEY=change-me      # required in x-zapier-events-key for /api/zapier/*
 
 # Business Config
 OWNER_EMAIL=
@@ -110,6 +122,23 @@ curl https://your-domain.com/api/health
 - [ ] Configure Twilio webhook URL: `https://your-domain.com/api/sms-webhook`
 - [ ] Test with "YES" response → booking link sent
 - [ ] Test with "STOP" → confirmed unsubscribe
+
+### Zapier Lead Flow
+
+- [ ] Configure `ZAPIER_LEAD_WEBHOOK_URL`
+- [ ] Finalize a test lead and confirm the webhook receives:
+  - `name`, `phone`, `service`, `address`, `notes`
+  - `ownerSmsMessage`, `customerAutoReplyText`, `customerAutoReplyEmailSubject`, `customerAutoReplyEmailBody`
+- [ ] In Zapier, map payload fields to:
+  - Google Sheets row
+  - owner SMS
+  - customer auto-reply text/email
+
+### Optional Zapier Event Endpoints
+
+- [ ] `POST /api/zapier/missed-call` forwards missed call events to Zapier
+- [ ] `POST /api/zapier/review-request` forwards manual review-request events to Zapier
+- [ ] If `ZAPIER_EVENTS_API_KEY` is set, include header: `x-zapier-events-key`
 
 ### Email Notifications
 

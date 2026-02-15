@@ -383,8 +383,8 @@ async function submitWithPhotos() {
     // Show result
     transitionToResult({
       headline: "✅ Request Received!",
-      message: "We'll review your request and contact you within 1 hour.",
-      subtext: "Then you can pick your preferred date and time.",
+      message: "We'll review your request and contact you shortly.",
+      subtext: "Check your phone or email for a confirmation message.",
     });
 
     // Reset state

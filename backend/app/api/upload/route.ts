@@ -8,7 +8,14 @@ import crypto from "crypto";
 import { v4 as uuidv4 } from "uuid";
 import { loadSession, saveSession } from "@/api/lib/utils";
 import { createNewSession } from "@/api/lib/chatbot";
-import type { SessionState, UploadResponseBody } from "@/api/lib/types";
+import type { UploadResponseBody } from "@/api/lib/types";
+import type { SessionState } from "@/api/lib/session";
+import { 
+  isCloudflareEnv, 
+  setCloudflareEnv,
+  r2UploadPhoto,
+  type CloudflareEnv 
+} from "@/api/lib/storage-cloudflare";
 
 // ----------------------
 // CONFIG
@@ -26,6 +33,17 @@ const uploadedHashes = new Map<string, Set<string>>();
 // ----------------------
 export async function POST(request: NextRequest) {
   try {
+    // Try to get Cloudflare env from request context (@cloudflare/next-on-pages)
+    try {
+      const { getRequestContext } = await import("@cloudflare/next-on-pages");
+      const ctx = getRequestContext();
+      if (ctx?.env) {
+        setCloudflareEnv(ctx.env as CloudflareEnv);
+      }
+    } catch {
+      // Not in Cloudflare environment - will use local storage
+    }
+
     const formData = await request.formData();
     const sessionId = formData.get("sessionId") as string;
     const files = formData.getAll("photos") as File[];
@@ -54,7 +72,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check photo limit
-    const currentPhotoCount = session.photoUrls?.length || 0;
+    const currentPhotoCount = session.photos?.urls?.length || 0;
     if (currentPhotoCount >= MAX_PHOTOS_PER_SESSION) {
       return NextResponse.json(
         {
@@ -111,13 +129,28 @@ export async function POST(request: NextRequest) {
       // Generate unique filename
       const ext = file.name.split(".").pop() || "jpg";
       const filename = `${uuidv4()}.${ext}`;
-      const filepath = path.join(sessionDir, filename);
+      
+      let url: string;
+      
+      // Use R2 in Cloudflare environment, local file otherwise
+      if (isCloudflareEnv()) {
+        // Upload to R2
+        const result = await r2UploadPhoto(sessionId, filename, bytes, file.type);
+        if (!result.success) {
+          console.error(`[Upload] R2 upload failed for ${filename}:`, result.error);
+          skipped.push({ reason: "upload_failed", filename: file.name });
+          continue;
+        }
+        url = result.url;
+        console.log(`[Upload] R2: ${url}`);
+      } else {
+        // Local file system upload
+        const filepath = path.join(sessionDir, filename);
+        await writeFile(filepath, buffer);
+        url = `/uploads/${sessionId}/${filename}`;
+        console.log(`[Upload] Local: ${url}`);
+      }
 
-      // Write file
-      await writeFile(filepath, buffer);
-
-      // Store relative URL
-      const url = `/uploads/${sessionId}/${filename}`;
       uploadedUrls.push(url);
 
       // Mark as uploaded for idempotency
@@ -125,26 +158,30 @@ export async function POST(request: NextRequest) {
     }
 
     // Update session with photo URLs
-    if (!session.photoUrls) {
-      session.photoUrls = [];
+    if (!session.photos) {
+      session.photos = { urls: [], count: 0 };
     }
-    session.photoUrls.push(...uploadedUrls);
-    session.hasPhotos = session.photoUrls.length > 0;
-    session.updatedAt = new Date().toISOString();
+    if (!session.photos.urls) {
+      session.photos.urls = [];
+    }
+    session.photos.urls.push(...uploadedUrls);
+    session.photos.count = session.photos.urls.length;
+    session.photos_uploaded = session.photos.urls.length > 0;
+    session.updated_at = new Date().toISOString();
 
     // Update status if we now have photos
-    if (session.hasPhotos && session.status === "awaiting_photos") {
+    if (session.photos_uploaded && session.status === "awaiting_photos") {
       session.status = "ready_for_estimate";
     }
 
     await saveSession(sessionId, session);
 
-    console.log(`[Upload] Session ${sessionId}: ${uploadedUrls.length} photos uploaded, total: ${session.photoUrls.length}`);
+    console.log(`[Upload] Session ${sessionId}: ${uploadedUrls.length} photos uploaded, total: ${session.photos.urls.length}`);
 
     const response: UploadResponseBody = {
       success: true,
       uploaded: uploadedUrls.length,
-      totalPhotos: session.photoUrls.length,
+      totalPhotos: session.photos.urls.length,
       maxPhotos: MAX_PHOTOS_PER_SESSION,
       urls: uploadedUrls,
       skipped: skipped.length > 0 ? skipped : undefined,

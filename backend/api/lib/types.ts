@@ -1,4 +1,10 @@
 // backend/api/lib/types.ts
+// Synchronized with session.ts - these are API-facing types
+
+import type { SessionState, ServiceType, Estimate } from "./session";
+
+// Re-export canonical types from session.ts
+export type { ServiceType, Estimate };
 
 export type ChatRole = "user" | "assistant" | "system";
 
@@ -7,70 +13,30 @@ export interface ChatMessage {
   content: string;
 }
 
-export type ServiceType = "tree_removal" | "stump_grinding" | "trimming" | "storm_cleanup" | "unknown";
-export type AccessLevel = "easy" | "medium" | "hard";
-export type SessionStatus = "collecting" | "awaiting_photos" | "ready_for_estimate" | "estimate_sent" | "approved" | "scheduled";
-
-export interface ContactInfo {
-  name?: string;
-  phone?: string;
-  email?: string;
-}
-
-export interface Estimate {
-  min: number;
-  max: number;
-  confidence: "high" | "medium" | "low";
-  drivers: string[];
-}
-
-export interface SessionState {
-  sessionId: string;
-  status: SessionStatus;
-  createdAt: string;
-  updatedAt: string;
-
-  // intake fields
-  zip?: string;
-  serviceType?: ServiceType;
-  treeCount?: number;
-  access?: AccessLevel;
-  location?: "front_yard" | "backyard" | "side_yard";
-  hasPowerLines?: boolean;
-  hasStructuresNearby?: boolean;
-  haulAway?: boolean | "unsure";
-  urgency?: "normal" | "urgent" | "emergency";
-
-  // photos
-  photoUrls: string[];
-  hasPhotos?: boolean;
-
-  // contact info
-  contact: ContactInfo;
-
-  // estimate
-  estimate?: Estimate;
-
-  // conversation memory
-  messages: ChatMessage[];
-
-  // Questions tracking - prevents repeating questions
-  questions_asked: string[];
-}
-
+// API Request/Response Types
 export interface ChatRequestBody {
-  sessionId?: string;
+  sessionId?: string | null;
   message: string;
-  stream?: boolean;  // optional: request streaming response
+  stream?: boolean;
+}
+
+// Collected fields for API response (subset of session data)
+export interface CollectedFields {
+  zip?: string | null;
+  serviceType?: string | null;
+  treeCount?: number | null;
+  access?: string | null;
+  hasPowerLines?: boolean | null;
+  hasPhotos?: boolean;
 }
 
 export interface ChatResponseBody {
   sessionId: string;
   assistantMessage: string;
   nextQuestions?: string[];
-  collected?: Partial<SessionState>;
+  collected?: CollectedFields;
   readyForPhotos?: boolean;
-  estimate?: Estimate;
+  estimate?: Estimate; // Only included for internal/owner use
 }
 
 // Upload types
@@ -90,7 +56,11 @@ export interface UploadResponseBody {
 // Finalize types
 export interface FinalizeRequestBody {
   sessionId: string;
-  contact: ContactInfo;
+  contact?: {
+    name?: string;
+    phone?: string;
+    email?: string;
+  };
 }
 
 export interface FinalizeResponseBody {
@@ -99,4 +69,14 @@ export interface FinalizeResponseBody {
   estimate?: Estimate;
   emailSent: boolean;
   smsSent: boolean;
+  zapier?: {
+    sent: boolean;
+    skipped: boolean;
+    error?: string;
+  };
+  hubspot?: {
+    synced: boolean;
+    dealId?: string;
+    contactId?: string;
+  };
 }
