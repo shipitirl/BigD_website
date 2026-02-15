@@ -554,7 +554,9 @@ export async function runChatTurn(state: SessionState, userMessage: string) {
     }
     // Add debug info to state for response
     (state as any)._debug_error = `ERR: ${errType} - ${errMsg}`;
-    assistantMessage = `I'm having trouble connecting to my brain right now (${errType}). Please check your connection or try again.`;
+    // Get provider for error message
+    const { provider, model } = getLLMConfig();
+    assistantMessage = `I'm having trouble connecting to my brain right now (${provider}/${model}). Please check your connection or try again.`;
   }
 
   // 3. Check Readiness
