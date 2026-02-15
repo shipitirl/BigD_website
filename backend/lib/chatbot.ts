@@ -525,8 +525,16 @@ export async function runChatTurn(state: SessionState, userMessage: string) {
       }
     }
 
-  } catch (err) {
+  } catch (err: any) {
     console.error("LLM Error:", err);
+    const errMsg = err?.message || err?.toString() || "Unknown error";
+    const errType = err?.constructor?.name || "Error";
+    console.error(`[LLM] Error type: ${errType}, message: ${errMsg}`);
+    if (err?.response?.data) {
+      console.error("[LLM] Response data:", JSON.stringify(err.response.data));
+    }
+    // Add debug info to state for response
+    (state as any)._debug_error = `${errType}: ${errMsg}`;
     assistantMessage = "I'm having trouble connecting to my brain right now. Please check your connection or try again.";
   }
 
