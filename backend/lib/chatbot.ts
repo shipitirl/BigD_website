@@ -99,22 +99,34 @@ function extractParsableJSONObject(text: string): string | null {
 
 import OpenAI from "openai";
 
-const llmProvider = (process.env.LLM_PROVIDER || (process.env.MINIMAX_API_KEY ? "minimax" : "openai")).toLowerCase();
-const llmModel = process.env.LLM_MODEL ||
-  (llmProvider === "minimax"
-    ? (process.env.MINIMAX_MODEL || "MiniMax-M2.5")
-    : (process.env.OPENAI_MODEL || "gpt-5.1"));
+// Get LLM config at RUNTIME (not build time) to pick up Vercel env vars
+function getLLMConfig() {
+  const provider = (process.env.LLM_PROVIDER || (process.env.MINIMAX_API_KEY ? "minimax" : "openai")).toLowerCase();
+  const model = process.env.LLM_MODEL ||
+    (provider === "minimax"
+      ? (process.env.MINIMAX_MODEL || "MiniMax-M2.5")
+      : (process.env.OPENAI_MODEL || "gpt-5.1"));
+  return { provider, model };
+}
 
-const llmClient = new OpenAI(
-  llmProvider === "minimax"
-    ? {
-        apiKey: process.env.MINIMAX_API_KEY,
-        baseURL: process.env.MINIMAX_BASE_URL || "https://api.minimax.io/v1",
-      }
-    : {
-        apiKey: process.env.OPENAI_API_KEY,
-      }
-);
+// Cache the client at runtime
+let _runtimeClient: OpenAI | null = null;
+function getRuntimeClient(): OpenAI {
+  if (!_runtimeClient) {
+    const { provider } = getLLMConfig();
+    _runtimeClient = new OpenAI(
+      provider === "minimax"
+        ? {
+            apiKey: process.env.MINIMAX_API_KEY,
+            baseURL: process.env.MINIMAX_BASE_URL || "https://api.minimax.io/v1",
+          }
+        : {
+            apiKey: process.env.OPENAI_API_KEY,
+          }
+    );
+  }
+  return _runtimeClient;
+}
 
 // ----------------------
 // LLM PROMPT GENERATOR
@@ -394,7 +406,9 @@ function applyManualExtraction(state: SessionState, u: any): void {
 // MAIN CHAT TURN (LLM)
 // ----------------------
 export async function runChatTurn(state: SessionState, userMessage: string) {
-  console.log("[runChatTurn] START - provider:", llmProvider, "model:", llmModel);
+  const { provider, model } = getLLMConfig();
+  const client = getRuntimeClient();
+  console.log("[runChatTurn] START - provider:", provider, "model:", model);
   // Update timestamp
   state.updated_at = new Date().toISOString();
   state.messages.push({ role: "user", content: userMessage });
@@ -406,7 +420,7 @@ export async function runChatTurn(state: SessionState, userMessage: string) {
 
   try {
     const systemPrompt = generateSystemPrompt(state);
-    console.log(`[LLM] Provider=${llmProvider} model=${llmModel} baseURL=${process.env.MINIMAX_BASE_URL || "default"} keypresent=${!!process.env.MINIMAX_API_KEY}`);
+    console.log(`[LLM] Provider=${provider} model=${model} baseURL=${process.env.MINIMAX_BASE_URL || "default"} keypresent=${!!process.env.MINIMAX_API_KEY}`);
     console.log(`[LLM] User message length: ${userMessage.length} chars`);
 
     // FIX #3: Truncate message history to last 15 messages to reduce latency
@@ -419,8 +433,8 @@ export async function runChatTurn(state: SessionState, userMessage: string) {
 
     let completion;
     try {
-      completion = await llmClient.chat.completions.create({
-        model: llmModel,
+      completion = await client.chat.completions.create({
+        model: model,
         messages: [
           { role: "system", content: systemPrompt },
           ...truncatedMessages.map(m => ({ role: m.role as "user" | "assistant", content: m.content })),
@@ -535,8 +549,8 @@ export async function runChatTurn(state: SessionState, userMessage: string) {
       console.error("[LLM] Response data:", JSON.stringify(err.response.data));
     }
     // Add debug info to state for response
-    (state as any)._debug_error = `${errType}: ${errMsg}`;
-    assistantMessage = "I'm having trouble connecting to my brain right now. Please check your connection or try again.";
+    (state as any)._debug_error = `ERR: ${errType} - ${errMsg}`;
+    assistantMessage = `I'm having trouble connecting to my brain right now (${errType}). Please check your connection or try again.`;
   }
 
   // 3. Check Readiness
@@ -657,12 +671,17 @@ export async function* streamChatTurn(
   state: SessionState,
   userMessage: string
 ): AsyncGenerator<string> {
+  // Get runtime config
+  const { provider, model } = getLLMConfig();
+  const client = getRuntimeClient();
+  
   // Update timestamp and add user message
   state.updated_at = new Date().toISOString();
   state.messages.push({ role: "user", content: userMessage });
   pushFlowEvent(state, 'user', userMessage);
 
   const systemPrompt = generateSystemPrompt(state);
+  console.log(`[Stream] Provider=${provider} model=${model}`);
 
   // Truncate message history to last 15 messages
   const MAX_MESSAGES = 15;
@@ -677,8 +696,8 @@ export async function* streamChatTurn(
 
   try {
     // Use actual OpenAI streaming
-    const stream = await llmClient.chat.completions.create({
-      model: llmModel,
+    const stream = await client.chat.completions.create({
+      model: model,
       messages: [
         { role: "system", content: systemPrompt },
         ...truncatedMessages.map(m => ({ role: m.role as "user" | "assistant", content: m.content })),
