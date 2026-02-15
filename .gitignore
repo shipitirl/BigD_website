@@ -29,3 +29,4 @@ node_modules/
 .vscode/
 *.swp
 env.js
+.vercel
