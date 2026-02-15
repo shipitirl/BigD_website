@@ -2,12 +2,12 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { loadSession, saveSession } from "@/api/lib/utils";
-import { calculateEstimate, createNewSession } from "@/api/lib/chatbot";
-import { notifyAll, sendEstimateToCustomer } from "@/api/lib/notifications";
-import { syncToHubSpot } from "@/api/lib/hubspot";
-import type { FinalizeRequestBody, FinalizeResponseBody } from "@/api/lib/types";
-import type { SessionState } from "@/api/lib/session";
+import { loadSession, saveSession } from "@/lib/utils";
+import { calculateEstimate, createNewSession } from "@/lib/chatbot";
+import { notifyAll, sendEstimateToCustomer } from "@/lib/notifications";
+import { syncToHubSpot } from "@/lib/hubspot";
+import type { FinalizeRequestBody, FinalizeResponseBody } from "@/lib/types";
+import type { SessionState } from "@/lib/session";
 
 // Zod schema for validation
 const FinalizeSchema = z.object({

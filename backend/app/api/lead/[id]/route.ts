@@ -3,12 +3,12 @@
 // ============================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { SessionState } from '@/api/lib/session';
-import { sendEstimateToCustomer, sendBookingConfirmation } from '@/api/lib/sms';
-import { loadSession, saveSession } from '@/api/lib/utils';
-import { verifyAdminToken } from '@/api/lib/tokens';
-import { withIdempotency } from '@/api/lib/idempotency';
-import { logger } from '@/api/lib/logger';
+import { SessionState } from '@/lib/session';
+import { sendEstimateToCustomer, sendBookingConfirmation } from '@/lib/sms';
+import { loadSession, saveSession } from '@/lib/utils';
+import { verifyAdminToken } from '@/lib/tokens';
+import { withIdempotency } from '@/lib/idempotency';
+import { logger } from '@/lib/logger';
 
 // ----------------------
 // Token Validation Helper

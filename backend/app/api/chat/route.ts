@@ -1,10 +1,10 @@
 // backend/app/api/chat/route.ts
 
 import { NextResponse } from "next/server";
-import { ChatRequestSchema, runChatTurn, streamChatTurn, createNewSession } from "@/api/lib/chatbot";
-import type { ChatRequestBody, ChatResponseBody } from "@/api/lib/types";
-import type { SessionState } from "@/api/lib/session";
-import { generateSessionId, loadSession, saveSession } from "@/api/lib/utils";
+import { ChatRequestSchema, runChatTurn, streamChatTurn, createNewSession } from "@/lib/chatbot";
+import type { ChatRequestBody, ChatResponseBody } from "@/lib/types";
+import type { SessionState } from "@/lib/session";
+import { generateSessionId, loadSession, saveSession } from "@/lib/utils";
 
 export async function POST(req: Request) {
   let json: ChatRequestBody;

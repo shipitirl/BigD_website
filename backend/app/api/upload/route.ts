@@ -6,10 +6,10 @@ import { existsSync } from "fs";
 import path from "path";
 import crypto from "crypto";
 import { v4 as uuidv4 } from "uuid";
-import { loadSession, saveSession } from "@/api/lib/utils";
-import { createNewSession } from "@/api/lib/chatbot";
-import type { UploadResponseBody } from "@/api/lib/types";
-import type { SessionState } from "@/api/lib/session";
+import { loadSession, saveSession } from "@/lib/utils";
+import { createNewSession } from "@/lib/chatbot";
+import type { UploadResponseBody } from "@/lib/types";
+import type { SessionState } from "@/lib/session";
 
 // ----------------------
 // CONFIG

@@ -4,11 +4,11 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { SessionState } from '@/api/lib/session';
-import { sendBookingConfirmation } from '@/api/lib/sms';
-import { withIdempotency, wasSmsProcessed } from '@/api/lib/idempotency';
-import { logger } from '@/api/lib/logger';
-import { findSessionByPhone, saveSession } from '@/api/lib/utils';
+import { SessionState } from '@/lib/session';
+import { sendBookingConfirmation } from '@/lib/sms';
+import { withIdempotency, wasSmsProcessed } from '@/lib/idempotency';
+import { logger } from '@/lib/logger';
+import { findSessionByPhone, saveSession } from '@/lib/utils';
 
 // ----------------------
 // CONFIG
