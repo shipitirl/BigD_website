@@ -569,12 +569,14 @@ export async function runChatTurn(state: SessionState, userMessage: string) {
   pushFlowEvent(state, 'status', `status=${state.status}`);
   state.messages.push({ role: "assistant", content: assistantMessage });
 
+  const debugInfo = (state as any)._debug_error || null;
   return {
     assistantMessage,
     nextQuestions,
     updatedState: state,
     readyForPhotos,
     estimate: state.estimate,
+    debug: debugInfo,
   };
 }
 

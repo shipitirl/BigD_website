@@ -104,7 +104,7 @@ export async function POST(req: Request) {
   await saveSession(sessionId, result.updatedState);
 
   // NOTE: Estimate is NOT sent to customer - it's owner-only (sent via email on finalize)
-  const response: ChatResponseBody & { state: typeof result.updatedState } = {
+  const response: ChatResponseBody & { state: typeof result.updatedState; debug?: string } = {
     sessionId,
     assistantMessage: result.assistantMessage,
     nextQuestions: result.nextQuestions,
@@ -120,6 +120,8 @@ export async function POST(req: Request) {
     },
     // Full state for debugging/testing (includes internal estimate)
     state: result.updatedState,
+    // Debug info
+    debug: result.debug,
   };
 
   return NextResponse.json(response, {
