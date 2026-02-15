@@ -21,6 +21,12 @@ const serviceLabels: Record<string, string> = {
   other: "Other",
 };
 
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
+
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
@@ -37,7 +43,7 @@ export async function POST(request: NextRequest) {
     if (!name || !phone || !details) {
       return NextResponse.json(
         { error: "Name, phone, and details are required" },
-        { status: 400 }
+        { status: 400, headers: CORS_HEADERS }
       );
     }
     
@@ -186,16 +192,29 @@ Source: Website Quote Form
     // Log the submission
     console.log(`[Quote] New request from ${name} (${phone}) - ${serviceLabel}`);
     
-    return NextResponse.json({
-      success: true,
-      message: "Quote request received",
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        message: "Quote request received",
+      },
+      { headers: CORS_HEADERS }
+    );
     
   } catch (error) {
     console.error("[Quote] Error:", error);
     return NextResponse.json(
       { error: "Failed to process quote request" },
-      { status: 500 }
+      { status: 500, headers: CORS_HEADERS }
     );
   }
+}
+
+// ----------------------
+// OPTIONS (CORS preflight)
+// ----------------------
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 200,
+    headers: CORS_HEADERS,
+  });
 }
