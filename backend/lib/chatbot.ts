@@ -12,12 +12,54 @@ export const ChatRequestSchema = z.object({
   stream: z.boolean().optional(),
 });
 
+const LLMResponseSchema = z.object({
+  assistant_message: z.string().default(""),
+  next_questions: z.array(z.string()).default([]),
+  updated_fields: z.record(z.any()).optional(),
+  memory_note: z.string().optional(),
+});
+
+function clip(text: string, max = 280): string {
+  return text.length <= max ? text : `${text.slice(0, max - 3)}...`;
+}
+
+function pushFlowEvent(state: SessionState, kind: 'user' | 'assistant' | 'state_update' | 'status', note: string): void {
+  state.flow_events.push({ at: new Date().toISOString(), kind, note: clip(note, 320) });
+  if (state.flow_events.length > 40) {
+    state.flow_events = state.flow_events.slice(-40);
+  }
+}
+
+function mergeConversationMemory(state: SessionState, userMessage: string, assistantMessage: string, memoryNote?: string): void {
+  const pieces = [
+    state.conversation_memory || "",
+    memoryNote ? `Note: ${clip(memoryNote, 180)}` : "",
+    `User: ${clip(userMessage, 180)}`,
+    `Assistant: ${clip(assistantMessage, 180)}`,
+  ].filter(Boolean);
+
+  const merged = pieces.join(" | ");
+  state.conversation_memory = merged.length > 1800 ? merged.slice(merged.length - 1800) : merged;
+}
+
 import OpenAI from "openai";
 
-// Initialize OpenAI
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+const llmProvider = (process.env.LLM_PROVIDER || (process.env.MINIMAX_API_KEY ? "minimax" : "openai")).toLowerCase();
+const llmModel = process.env.LLM_MODEL ||
+  (llmProvider === "minimax"
+    ? (process.env.MINIMAX_MODEL || "MiniMax-M2.5")
+    : (process.env.OPENAI_MODEL || "gpt-5.1"));
+
+const llmClient = new OpenAI(
+  llmProvider === "minimax"
+    ? {
+        apiKey: process.env.MINIMAX_API_KEY,
+        baseURL: process.env.MINIMAX_BASE_URL || "https://api.minimax.chat/v1",
+      }
+    : {
+        apiKey: process.env.OPENAI_API_KEY,
+      }
+);
 
 // ----------------------
 // LLM PROMPT GENERATOR
@@ -51,6 +93,9 @@ function generateSystemPrompt(state: SessionState): string {
     contact: state.contact,
     // Fields we've already asked about (don't re-ask these)
     questions_asked: state.questions_asked || [],
+    // Rolling memory summary + recent flow events for long sessions
+    conversation_memory: state.conversation_memory || null,
+    flow_events: (state.flow_events || []).slice(-8),
   });
 
   return `You are Corey, the friendly and professional AI assistant for Big D's Tree Service.
@@ -136,7 +181,8 @@ function generateSystemPrompt(state: SessionState): string {
   {
     "assistant_message": "The text you reply to the user",
     "next_questions": ["Question 1", "Question 2"],
-    "updated_fields": { ... }
+    "updated_fields": { ... },
+    "memory_note": "Optional one-line summary of what changed this turn"
   }
   `;
 }
@@ -296,12 +342,15 @@ export async function runChatTurn(state: SessionState, userMessage: string) {
   // Update timestamp
   state.updated_at = new Date().toISOString();
   state.messages.push({ role: "user", content: userMessage });
+  pushFlowEvent(state, 'user', userMessage);
 
   let assistantMessage = "";
   let nextQuestions: string[] = [];
+  let memoryNote: string | undefined;
 
   try {
     const systemPrompt = generateSystemPrompt(state);
+    console.log(`[LLM] Provider=${llmProvider} model=${llmModel}`);
     console.log(`[LLM] User message length: ${userMessage.length} chars`);
 
     // FIX #3: Truncate message history to last 15 messages to reduce latency
@@ -312,8 +361,8 @@ export async function runChatTurn(state: SessionState, userMessage: string) {
 
     console.log(`[LLM] Sending ${truncatedMessages.length} messages (truncated from ${state.messages.length})`);
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-5.1", // switched per request
+    const completion = await llmClient.chat.completions.create({
+      model: llmModel,
       messages: [
         { role: "system", content: systemPrompt },
         ...truncatedMessages.map(m => ({ role: m.role as "user" | "assistant", content: m.content })),
@@ -334,19 +383,24 @@ export async function runChatTurn(state: SessionState, userMessage: string) {
       console.error("LLM returned empty response. Full completion object:", JSON.stringify(completion));
       assistantMessage = "I didn't catch that. Could you please repeat what you said?";
     } else {
-      let result: any;
+      let result: z.infer<typeof LLMResponseSchema> = { assistant_message: "", next_questions: [] };
       try {
         // CLEANUP: Remove ```json ... ``` wrappers if present
         let cleanContent = rawContent.trim();
         if (cleanContent.startsWith("```")) {
           cleanContent = cleanContent.replace(/^```json\s*/, "").replace(/^```\s*/, "").replace(/\s*```$/, "");
         }
-        
-        result = JSON.parse(cleanContent);
+
+        const parsedResult = LLMResponseSchema.safeParse(JSON.parse(cleanContent));
+        if (parsedResult.success) {
+          result = parsedResult.data;
+        } else {
+          console.error("LLM schema validation error:", parsedResult.error.flatten());
+          assistantMessage = "I had a hiccup processing that. Could you please try again?";
+        }
       } catch (parseError) {
         console.error("LLM JSON parse error:", parseError, "Raw:", rawContent.substring(0, 200));
         assistantMessage = "I had a hiccup processing that. Could you please try again?";
-        result = {};
       }
 
       // 1. Validate and Update State using validation layer
@@ -380,6 +434,7 @@ export async function runChatTurn(state: SessionState, userMessage: string) {
         assistantMessage = result.assistant_message;
       }
       nextQuestions = result.next_questions || [];
+      memoryNote = result.memory_note;
 
       // FIX #1: Track questions asked to prevent repeating questions
       // Map common question patterns to question IDs
@@ -441,6 +496,9 @@ export async function runChatTurn(state: SessionState, userMessage: string) {
     state.status = "collecting";
   }
 
+  mergeConversationMemory(state, userMessage, assistantMessage, memoryNote);
+  pushFlowEvent(state, 'assistant', assistantMessage);
+  pushFlowEvent(state, 'status', `status=${state.status}`);
   state.messages.push({ role: "assistant", content: assistantMessage });
 
   return {
@@ -532,6 +590,7 @@ export async function* streamChatTurn(
   // Update timestamp and add user message
   state.updated_at = new Date().toISOString();
   state.messages.push({ role: "user", content: userMessage });
+  pushFlowEvent(state, 'user', userMessage);
 
   const systemPrompt = generateSystemPrompt(state);
 
@@ -543,12 +602,13 @@ export async function* streamChatTurn(
 
   let fullContent = "";
   let assistantMessage = "";
+  let memoryNote: string | undefined;
   const extractor = new AssistantMessageExtractor();
 
   try {
     // Use actual OpenAI streaming
-    const stream = await openai.chat.completions.create({
-      model: "gpt-5.1",
+    const stream = await llmClient.chat.completions.create({
+      model: llmModel,
       messages: [
         { role: "system", content: systemPrompt },
         ...truncatedMessages.map(m => ({ role: m.role as "user" | "assistant", content: m.content })),
@@ -574,16 +634,21 @@ export async function* streamChatTurn(
     }
 
     // Parse the complete JSON response for state updates
-    let result: any = {};
+    let result: z.infer<typeof LLMResponseSchema> = { assistant_message: assistantMessage, next_questions: [] };
     try {
       let cleanContent = fullContent.trim();
       if (cleanContent.startsWith("```")) {
         cleanContent = cleanContent.replace(/^```json\s*/, "").replace(/^```\s*/, "").replace(/\s*```$/, "");
       }
-      result = JSON.parse(cleanContent);
+      const parsedResult = LLMResponseSchema.safeParse(JSON.parse(cleanContent));
+      if (parsedResult.success) {
+        result = parsedResult.data;
+        memoryNote = result.memory_note;
+      } else {
+        console.error("[Stream] Schema validation error:", parsedResult.error.flatten());
+      }
     } catch (parseError) {
       console.error("[Stream] JSON parse error:", parseError);
-      result = { assistant_message: assistantMessage };
     }
 
     // Apply state updates
@@ -653,6 +718,9 @@ export async function* streamChatTurn(
     state.status = "collecting";
   }
 
+  mergeConversationMemory(state, userMessage, assistantMessage, memoryNote);
+  pushFlowEvent(state, 'assistant', assistantMessage);
+  pushFlowEvent(state, 'status', `status=${state.status}`);
   state.messages.push({ role: "assistant", content: assistantMessage });
 }
 

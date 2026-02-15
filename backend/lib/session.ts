@@ -76,6 +76,12 @@ export interface Estimate {
   drivers: string[];
 }
 
+export interface FlowEvent {
+  at: string;
+  kind: 'user' | 'assistant' | 'state_update' | 'status';
+  note: string;
+}
+
 export interface SessionState {
   lead_id: string;
   status: SessionStatus;
@@ -107,6 +113,10 @@ export interface SessionState {
 
   // Questions tracking - prevents repeating questions
   questions_asked: string[];
+
+  // Rolling memory + flow tracking across long conversations
+  conversation_memory: string | null;
+  flow_events: FlowEvent[];
 
   // CRM tracking (optional - populated after finalization)
   hubspot_deal_id?: string;
@@ -144,6 +154,8 @@ export function createSession(): SessionState {
     estimate: null,
     messages: [],
     questions_asked: [],
+    conversation_memory: null,
+    flow_events: [],
   };
 }
 
