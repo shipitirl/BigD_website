@@ -109,11 +109,13 @@ function getLLMConfig() {
   return { provider, model };
 }
 
-// Cache the client at runtime
+// Cache the client at runtime - but check provider each time to handle env changes
 let _runtimeClient: OpenAI | null = null;
+let _cachedProvider: string | null = null;
 function getRuntimeClient(): OpenAI {
-  if (!_runtimeClient) {
-    const { provider } = getLLMConfig();
+  const { provider } = getLLMConfig();
+  // Recreate client if provider changed (e.g., after env update)
+  if (!_runtimeClient || _cachedProvider !== provider) {
     _runtimeClient = new OpenAI(
       provider === "minimax"
         ? {
@@ -124,6 +126,8 @@ function getRuntimeClient(): OpenAI {
             apiKey: process.env.OPENAI_API_KEY,
           }
     );
+    _cachedProvider = provider;
+    console.log(`[LLM] Created new client for provider: ${provider}`);
   }
   return _runtimeClient;
 }
