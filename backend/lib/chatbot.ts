@@ -42,6 +42,61 @@ function mergeConversationMemory(state: SessionState, userMessage: string, assis
   state.conversation_memory = merged.length > 1800 ? merged.slice(merged.length - 1800) : merged;
 }
 
+function stripCodeFence(text: string): string {
+  let clean = text.trim();
+  if (clean.startsWith("```")) {
+    clean = clean.replace(/^```json\s*/i, "").replace(/^```\s*/, "").replace(/\s*```$/, "");
+  }
+  return clean;
+}
+
+// Some providers prepend reasoning text before the JSON payload.
+// Scan brace-delimited segments and return the first parsable JSON object.
+function extractParsableJSONObject(text: string): string | null {
+  for (let start = text.indexOf("{"); start !== -1; start = text.indexOf("{", start + 1)) {
+    let depth = 0;
+    let inString = false;
+    let escapeNext = false;
+
+    for (let i = start; i < text.length; i += 1) {
+      const ch = text[i];
+
+      if (escapeNext) {
+        escapeNext = false;
+        continue;
+      }
+
+      if (ch === "\\") {
+        escapeNext = true;
+        continue;
+      }
+
+      if (ch === '"') {
+        inString = !inString;
+        continue;
+      }
+
+      if (inString) continue;
+
+      if (ch === "{") depth += 1;
+      if (ch === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          const candidate = text.slice(start, i + 1);
+          try {
+            JSON.parse(candidate);
+            return candidate;
+          } catch {
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
 import OpenAI from "openai";
 
 const llmProvider = (process.env.LLM_PROVIDER || (process.env.MINIMAX_API_KEY ? "minimax" : "openai")).toLowerCase();
@@ -54,7 +109,7 @@ const llmClient = new OpenAI(
   llmProvider === "minimax"
     ? {
         apiKey: process.env.MINIMAX_API_KEY,
-        baseURL: process.env.MINIMAX_BASE_URL || "https://api.minimax.chat/v1",
+        baseURL: process.env.MINIMAX_BASE_URL || "https://api.minimax.io/v1",
       }
     : {
         apiKey: process.env.OPENAI_API_KEY,
@@ -385,13 +440,10 @@ export async function runChatTurn(state: SessionState, userMessage: string) {
     } else {
       let result: z.infer<typeof LLMResponseSchema> = { assistant_message: "", next_questions: [] };
       try {
-        // CLEANUP: Remove ```json ... ``` wrappers if present
-        let cleanContent = rawContent.trim();
-        if (cleanContent.startsWith("```")) {
-          cleanContent = cleanContent.replace(/^```json\s*/, "").replace(/^```\s*/, "").replace(/\s*```$/, "");
-        }
+        const cleanContent = stripCodeFence(rawContent);
+        const jsonPayload = extractParsableJSONObject(cleanContent) || cleanContent;
 
-        const parsedResult = LLMResponseSchema.safeParse(JSON.parse(cleanContent));
+        const parsedResult = LLMResponseSchema.safeParse(JSON.parse(jsonPayload));
         if (parsedResult.success) {
           result = parsedResult.data;
         } else {
@@ -636,11 +688,9 @@ export async function* streamChatTurn(
     // Parse the complete JSON response for state updates
     let result: z.infer<typeof LLMResponseSchema> = { assistant_message: assistantMessage, next_questions: [] };
     try {
-      let cleanContent = fullContent.trim();
-      if (cleanContent.startsWith("```")) {
-        cleanContent = cleanContent.replace(/^```json\s*/, "").replace(/^```\s*/, "").replace(/\s*```$/, "");
-      }
-      const parsedResult = LLMResponseSchema.safeParse(JSON.parse(cleanContent));
+      const cleanContent = stripCodeFence(fullContent);
+      const jsonPayload = extractParsableJSONObject(cleanContent) || cleanContent;
+      const parsedResult = LLMResponseSchema.safeParse(JSON.parse(jsonPayload));
       if (parsedResult.success) {
         result = parsedResult.data;
         memoryNote = result.memory_note;
