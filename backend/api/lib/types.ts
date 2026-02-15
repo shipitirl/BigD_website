@@ -69,11 +69,6 @@ export interface FinalizeResponseBody {
   estimate?: Estimate;
   emailSent: boolean;
   smsSent: boolean;
-  zapier?: {
-    sent: boolean;
-    skipped: boolean;
-    error?: string;
-  };
   hubspot?: {
     synced: boolean;
     dealId?: string;

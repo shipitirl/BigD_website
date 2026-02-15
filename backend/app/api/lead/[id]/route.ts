@@ -8,7 +8,6 @@ import { sendEstimateToCustomer, sendBookingConfirmation } from '@/api/lib/sms';
 import { loadSession, saveSession } from '@/api/lib/utils';
 import { verifyAdminToken } from '@/api/lib/tokens';
 import { withIdempotency } from '@/api/lib/idempotency';
-import { getAllowedActions } from '@/api/lib/validation';
 import { logger } from '@/api/lib/logger';
 
 // ----------------------
@@ -97,9 +96,6 @@ export async function POST(
       );
     }
 
-    // Check state gates
-    const allowedActions = getAllowedActions(session as unknown as Record<string, unknown>);
-    
     // Check if owner approval is allowed
     const hasPhotos = session.photos.urls.length > 0;
     if (!hasPhotos && !approve_without_photos) {
@@ -135,7 +131,7 @@ export async function POST(
 
           // Send SMS to customer (only if allowed)
           let smsSent = false;
-          if (allowedActions.canTextCustomer && !needsSiteVisit) {
+          if (Boolean(session.contact?.phone) && !needsSiteVisit) {
             smsSent = await sendEstimateToCustomer(session);
             if (smsSent) {
               logger.smsSent(id, session.contact.phone || 'unknown');
@@ -184,7 +180,7 @@ export async function POST(
 
           // Send SMS to customer (only if allowed)
           let smsSent = false;
-          if (allowedActions.canTextCustomer && !needsSiteVisit) {
+          if (Boolean(session.contact?.phone) && !needsSiteVisit) {
             smsSent = await sendEstimateToCustomer(session);
             if (smsSent) {
               logger.smsSent(id, session.contact.phone || 'unknown');

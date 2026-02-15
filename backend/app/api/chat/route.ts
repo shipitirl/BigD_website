@@ -5,20 +5,8 @@ import { ChatRequestSchema, runChatTurn, streamChatTurn, createNewSession } from
 import type { ChatRequestBody, ChatResponseBody } from "@/api/lib/types";
 import type { SessionState } from "@/api/lib/session";
 import { generateSessionId, loadSession, saveSession } from "@/api/lib/utils";
-import { setCloudflareEnv, type CloudflareEnv } from "@/api/lib/storage-cloudflare";
 
 export async function POST(req: Request) {
-  // Try to get Cloudflare env from request context (@cloudflare/next-on-pages)
-  try {
-    const { getRequestContext } = await import("@cloudflare/next-on-pages");
-    const ctx = getRequestContext();
-    if (ctx?.env) {
-      setCloudflareEnv(ctx.env as CloudflareEnv);
-    }
-  } catch {
-    // Not in Cloudflare environment - will use local storage
-  }
-
   let json: ChatRequestBody;
 
   try {

@@ -10,12 +10,6 @@ import { loadSession, saveSession } from "@/api/lib/utils";
 import { createNewSession } from "@/api/lib/chatbot";
 import type { UploadResponseBody } from "@/api/lib/types";
 import type { SessionState } from "@/api/lib/session";
-import { 
-  isCloudflareEnv, 
-  setCloudflareEnv,
-  r2UploadPhoto,
-  type CloudflareEnv 
-} from "@/api/lib/storage-cloudflare";
 
 // ----------------------
 // CONFIG
@@ -33,17 +27,6 @@ const uploadedHashes = new Map<string, Set<string>>();
 // ----------------------
 export async function POST(request: NextRequest) {
   try {
-    // Try to get Cloudflare env from request context (@cloudflare/next-on-pages)
-    try {
-      const { getRequestContext } = await import("@cloudflare/next-on-pages");
-      const ctx = getRequestContext();
-      if (ctx?.env) {
-        setCloudflareEnv(ctx.env as CloudflareEnv);
-      }
-    } catch {
-      // Not in Cloudflare environment - will use local storage
-    }
-
     const formData = await request.formData();
     const sessionId = formData.get("sessionId") as string;
     const files = formData.getAll("photos") as File[];
@@ -130,26 +113,11 @@ export async function POST(request: NextRequest) {
       const ext = file.name.split(".").pop() || "jpg";
       const filename = `${uuidv4()}.${ext}`;
       
-      let url: string;
-      
-      // Use R2 in Cloudflare environment, local file otherwise
-      if (isCloudflareEnv()) {
-        // Upload to R2
-        const result = await r2UploadPhoto(sessionId, filename, bytes, file.type);
-        if (!result.success) {
-          console.error(`[Upload] R2 upload failed for ${filename}:`, result.error);
-          skipped.push({ reason: "upload_failed", filename: file.name });
-          continue;
-        }
-        url = result.url;
-        console.log(`[Upload] R2: ${url}`);
-      } else {
-        // Local file system upload
-        const filepath = path.join(sessionDir, filename);
-        await writeFile(filepath, buffer);
-        url = `/uploads/${sessionId}/${filename}`;
-        console.log(`[Upload] Local: ${url}`);
-      }
+      // Local file system upload
+      const filepath = path.join(sessionDir, filename);
+      await writeFile(filepath, buffer);
+      const url = `/uploads/${sessionId}/${filename}`;
+      console.log(`[Upload] Local: ${url}`);
 
       uploadedUrls.push(url);
 

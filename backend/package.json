@@ -24,7 +24,6 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
-    "@cloudflare/next-on-pages": "^1.13.16",
     "@types/jest": "^29.0.0",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20.0.0",

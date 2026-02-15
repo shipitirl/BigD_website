@@ -7,12 +7,6 @@ import { format } from "date-fns";
 import type { SessionState } from "./session";
 import type { Lead } from "./lead";
 import { ensureLeadSchema } from "./lead-migration";
-import { 
-  isCloudflareEnv, 
-  d1LoadSession, 
-  d1SaveSession, 
-  d1DeleteSession 
-} from "./storage-cloudflare";
 
 const SESSIONS_DIR = path.join(process.cwd(), ".sessions");
 
@@ -177,33 +171,16 @@ async function getAdapter(): Promise<StorageAdapter> {
 }
 
 export async function loadSession(sessionId: string): Promise<SessionState | null> {
-  // Use D1 in Cloudflare environment
-  if (isCloudflareEnv()) {
-    return d1LoadSession(sessionId);
-  }
-  // Fallback to PostgreSQL or file adapter
   const adapter = await getAdapter();
   return adapter.load<SessionState>(sessionId);
 }
 
 export async function saveSession(sessionId: string, data: SessionState): Promise<void> {
-  // Use D1 in Cloudflare environment
-  if (isCloudflareEnv()) {
-    await d1SaveSession(sessionId, data);
-    return;
-  }
-  // Fallback to PostgreSQL or file adapter
   const adapter = await getAdapter();
   await adapter.save(sessionId, data);
 }
 
 export async function deleteSession(sessionId: string): Promise<void> {
-  // Use D1 in Cloudflare environment
-  if (isCloudflareEnv()) {
-    await d1DeleteSession(sessionId);
-    return;
-  }
-  // Fallback to PostgreSQL or file adapter
   const adapter = await getAdapter();
   await adapter.delete(sessionId);
 }
@@ -214,11 +191,6 @@ export async function deleteSession(sessionId: string): Promise<void> {
 export async function findSessionByPhone(phone: string): Promise<SessionState | null> {
   const digits = phone.replace(/\D/g, "");
   const normalized = digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
-
-  if (isCloudflareEnv()) {
-    console.warn("[Storage] findSessionByPhone not supported in D1 environment yet");
-    return null;
-  }
 
   // Try PostgreSQL first if configured
   if (process.env.DATABASE_URL) {

@@ -6,10 +6,8 @@ import { loadSession, saveSession } from "@/api/lib/utils";
 import { calculateEstimate, createNewSession } from "@/api/lib/chatbot";
 import { notifyAll, sendEstimateToCustomer } from "@/api/lib/notifications";
 import { syncToHubSpot } from "@/api/lib/hubspot";
-import { sendLeadToZapier } from "@/api/lib/zapier";
 import type { FinalizeRequestBody, FinalizeResponseBody } from "@/api/lib/types";
 import type { SessionState } from "@/api/lib/session";
-import { setCloudflareEnv, type CloudflareEnv } from "@/api/lib/storage-cloudflare";
 
 // Zod schema for validation
 const FinalizeSchema = z.object({
@@ -23,7 +21,6 @@ const FinalizeSchema = z.object({
 
 // Track finalized sessions for idempotency
 const finalizedSessions = new Set<string>();
-const ENABLE_ZAPIER_LEAD_FLOW = process.env.ENABLE_ZAPIER_LEAD_FLOW !== "false";
 const ENABLE_NATIVE_NOTIFICATIONS = process.env.ENABLE_NATIVE_NOTIFICATIONS === "true";
 const ENABLE_HUBSPOT_SYNC = process.env.ENABLE_HUBSPOT_SYNC === "true";
 
@@ -32,17 +29,6 @@ const ENABLE_HUBSPOT_SYNC = process.env.ENABLE_HUBSPOT_SYNC === "true";
 // ----------------------
 export async function POST(request: NextRequest) {
   try {
-    // Try to get Cloudflare env from request context (@cloudflare/next-on-pages)
-    try {
-      const { getRequestContext } = await import("@cloudflare/next-on-pages");
-      const ctx = getRequestContext();
-      if (ctx?.env) {
-        setCloudflareEnv(ctx.env as CloudflareEnv);
-      }
-    } catch {
-      // Not in Cloudflare environment - will use local storage
-    }
-
     const body = await request.json();
 
     const parsed = FinalizeSchema.safeParse(body);
@@ -116,32 +102,16 @@ export async function POST(request: NextRequest) {
     // Save session
     await saveSession(sessionId, session);
 
-    // Send lead event to Zapier (Sheet row + owner/customer notifications)
-    const zapierResult = ENABLE_ZAPIER_LEAD_FLOW
-      ? await sendLeadToZapier(session)
-      : { sent: false, skipped: true as const };
-
-    // Native notifications are fallback by default, or can be force-enabled
-    const shouldUseNativeNotifications =
-      ENABLE_NATIVE_NOTIFICATIONS ||
-      !ENABLE_ZAPIER_LEAD_FLOW ||
-      zapierResult.skipped ||
-      !zapierResult.sent;
-
     let emailSent = false;
     let smsSent = false;
     let customerSmsSent = false;
 
-    if (shouldUseNativeNotifications) {
-      const notificationResult = await notifyAll(session);
-      emailSent = notificationResult.emailSent;
-      smsSent = notificationResult.smsSent;
+    const notificationResult = await notifyAll(session);
+    emailSent = notificationResult.emailSent;
+    smsSent = notificationResult.smsSent;
 
-      if (session.contact.phone) {
-        customerSmsSent = await sendEstimateToCustomer(session);
-      }
-    } else {
-      console.log("[Finalize] Native notifications skipped (Zapier lead flow active)");
+    if (session.contact.phone) {
+      customerSmsSent = await sendEstimateToCustomer(session);
     }
 
     // Optional CRM sync (off by default for Zapier-first workflow)
@@ -164,7 +134,6 @@ export async function POST(request: NextRequest) {
 
     console.log(
       `[Finalize] Session ${sessionId} finalized. ` +
-      `Zapier: ${zapierResult.sent ? "sent" : zapierResult.skipped ? "skipped" : "failed"}, ` +
       `Email: ${emailSent}, Owner SMS: ${smsSent}, Customer SMS: ${customerSmsSent}, ` +
       `HubSpot: ${hubspotResult.success ? hubspotResult.dealId || "synced" : "skipped/failed"}`
     );
@@ -175,11 +144,6 @@ export async function POST(request: NextRequest) {
       estimate: session.estimate,
       emailSent,
       smsSent: smsSent || customerSmsSent,
-      zapier: {
-        sent: zapierResult.sent,
-        skipped: zapierResult.skipped,
-        error: zapierResult.error,
-      },
       hubspot: {
         synced: hubspotResult.success,
         dealId: hubspotResult.dealId,
