@@ -405,7 +405,7 @@ export async function runChatTurn(state: SessionState, userMessage: string) {
 
   try {
     const systemPrompt = generateSystemPrompt(state);
-    console.log(`[LLM] Provider=${llmProvider} model=${llmModel}`);
+    console.log(`[LLM] Provider=${llmProvider} model=${llmModel} baseURL=${process.env.MINIMAX_BASE_URL || "default"} keypresent=${!!process.env.MINIMAX_API_KEY}`);
     console.log(`[LLM] User message length: ${userMessage.length} chars`);
 
     // FIX #3: Truncate message history to last 15 messages to reduce latency
