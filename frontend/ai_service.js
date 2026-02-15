@@ -1,6 +1,6 @@
 // frontend/ai_service.js
 
-const API_URL = window.ENV?.BACKEND_URL || "http://localhost:3001";
+const API_URL = window.ENV?.BACKEND_URL || window.ENV?.API_BASE || "https://bigd-backend.vercel.app";
 
 /**
  * Send a message to the chat API (non-streaming)

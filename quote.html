@@ -444,7 +444,7 @@
             });
             
             try {
-                const API_BASE = window.ENV?.API_BASE || 'http://localhost:3001';
+                const API_BASE = window.ENV?.BACKEND_URL || window.ENV?.API_BASE || 'https://bigd-backend.vercel.app';
                 const response = await fetch(`${API_BASE}/api/quote`, {
                     method: 'POST',
                     body: formData

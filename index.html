@@ -259,7 +259,7 @@
           msg.textContent = 'Sending...';
           const fd = new FormData(form);
           try {
-            const API_BASE = (window.ENV && window.ENV.API_BASE) || 'http://localhost:3001';
+            const API_BASE = (window.ENV && (window.ENV.BACKEND_URL || window.ENV.API_BASE)) || 'https://bigd-backend.vercel.app';
             const res = await fetch(`${API_BASE}/api/quote`, { method:'POST', body: fd });
             if(!res.ok) throw new Error('Request failed');
             form.reset();
