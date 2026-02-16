@@ -30,11 +30,11 @@ const API_URL = computeApiUrl();
 /**
  * Send a message to the chat API (non-streaming)
  */
-export async function sendMessage({ sessionId, message }) {
+export async function sendMessage({ sessionId, message, clientCollected }) {
   const res = await fetch(`${API_URL}/api/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ sessionId, message }),
+    body: JSON.stringify({ sessionId, message, clientCollected }),
   });
 
   if (!res.ok) {
@@ -54,12 +54,12 @@ export async function sendMessage({ sessionId, message }) {
  * @param {function} options.onDone - Called when streaming completes
  * @param {function} options.onError - Called on error
  */
-export async function sendMessageStream({ sessionId, message, onChunk, onDone, onError }) {
+export async function sendMessageStream({ sessionId, message, clientCollected, onChunk, onDone, onError }) {
   try {
     const res = await fetch(`${API_URL}/api/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sessionId, message, stream: true }),
+      body: JSON.stringify({ sessionId, message, stream: true, clientCollected }),
     });
 
     if (!res.ok) {

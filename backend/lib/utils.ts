@@ -116,7 +116,7 @@ const postgresAdapter: StorageAdapter = {
         "SELECT data FROM sessions WHERE session_id = $1",
         [key]
       );
-      if (result.rows.length === 0) return null;
+      if (result.rows.length === 0) return fileAdapter.load(key);
       return result.rows[0].data as T;
     } catch (err) {
       console.error("[Storage] PostgreSQL load error:", err);
@@ -198,7 +198,7 @@ const supabaseAdapter: StorageAdapter = {
         .eq("session_id", key)
         .single();
       
-      if (error || !data) return null;
+      if (error || !data) return fileAdapter.load(key);
       return data.data as T;
     } catch (err) {
       console.error("[Storage] Supabase load error:", err);

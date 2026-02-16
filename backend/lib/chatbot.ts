@@ -11,6 +11,25 @@ export const ChatRequestSchema = z.object({
   sessionId: z.string().nullable().optional(),
   message: z.string().min(1).max(4000),
   stream: z.boolean().optional(),
+  clientCollected: z
+    .object({
+      zip: z.string().optional().nullable(),
+      serviceType: z.string().optional().nullable(),
+      treeCount: z.number().optional().nullable(),
+      access: z.string().optional().nullable(),
+      slope: z.string().optional().nullable(),
+      gateWidthFt: z.number().optional().nullable(),
+      hasPowerLines: z.boolean().optional().nullable(),
+      hasStructuresNearby: z.boolean().optional().nullable(),
+      haulAway: z.union([z.boolean(), z.literal("unsure"), z.null()]).optional(),
+      contactName: z.string().optional().nullable(),
+      contactPhone: z.string().optional().nullable(),
+      contactEmail: z.string().optional().nullable(),
+      contactAddress: z.string().optional().nullable(),
+      contactCity: z.string().optional().nullable(),
+      hasPhotos: z.boolean().optional(),
+    })
+    .optional(),
 });
 
 const UpdatedFieldsSchema = z.object({}).passthrough().optional();

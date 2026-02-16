@@ -18,6 +18,7 @@ export interface ChatRequestBody {
   sessionId?: string | null;
   message: string;
   stream?: boolean;
+  clientCollected?: CollectedFields;
 }
 
 // Collected fields for API response (subset of session data)
@@ -26,7 +27,16 @@ export interface CollectedFields {
   serviceType?: string | null;
   treeCount?: number | null;
   access?: string | null;
+  slope?: string | null;
+  gateWidthFt?: number | null;
   hasPowerLines?: boolean | null;
+  hasStructuresNearby?: boolean | null;
+  haulAway?: boolean | "unsure" | null;
+  contactName?: string | null;
+  contactPhone?: string | null;
+  contactEmail?: string | null;
+  contactAddress?: string | null;
+  contactCity?: string | null;
   hasPhotos?: boolean;
 }
 

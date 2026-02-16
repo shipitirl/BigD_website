@@ -116,6 +116,7 @@ function closeChat() {
     // Reset state
     appState.sessionId = null;
     appState.messages = [];
+    appState.collected = {};
     messagesEl.innerHTML = "";
     photoSection?.classList.add("hidden");
     resultSection?.classList.add("hidden");
@@ -173,6 +174,7 @@ async function handleSubmit(userText) {
       await sendMessageStream({
         sessionId: appState.sessionId,
         message: userText,
+        clientCollected: appState.collected,
         onChunk: (chunk) => {
           fullMessage += chunk;
           // Format as we stream
@@ -186,6 +188,9 @@ async function handleSubmit(userText) {
         onDone: (data) => {
           appState.sessionId = data.sessionId;
           appState.messages.push({ role: "assistant", content: fullMessage });
+          if (data.collected) {
+            appState.collected = { ...appState.collected, ...data.collected };
+          }
 
           // Handle ready for photos (metadata + text fallback)
           const shouldShowUploader =
@@ -214,11 +219,15 @@ async function handleSubmit(userText) {
       const data = await sendMessage({
         sessionId: appState.sessionId,
         message: userText,
+        clientCollected: appState.collected,
       });
 
       hideTyping();
       appState.sessionId = data.sessionId;
       appState.messages.push({ role: "assistant", content: data.assistantMessage });
+      if (data.collected) {
+        appState.collected = { ...appState.collected, ...data.collected };
+      }
       renderMessage("assistant", data.assistantMessage);
 
       const shouldShowUploader =
@@ -254,6 +263,7 @@ async function handleHeroSubmit() {
     // Reset state
     appState.sessionId = null;
     appState.messages = [];
+    appState.collected = {};
     messagesEl.innerHTML = "";
     uploadedPhotos = [];
     setChatBusy(false);
@@ -416,6 +426,7 @@ async function submitWithPhotos() {
     // Reset state
     appState.sessionId = null;
     appState.messages = [];
+    appState.collected = {};
     uploadedPhotos = [];
   } catch (err) {
     console.error("Submit error:", err);
