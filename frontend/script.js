@@ -1,7 +1,7 @@
 // frontend/script.js
 
 import { appState } from "./state.js";
-import { sendMessage, sendMessageStream, uploadPhotos, finalize } from "./ai_service.js";
+import { sendMessage, sendMessageStream, finalize } from "./ai_service.js";
 
 // Use streaming by default (feels faster)
 const USE_STREAMING = true;
@@ -390,25 +390,18 @@ async function submitWithPhotos() {
   }
 
   try {
-    // Upload photos if any
-    if (uploadedPhotos.length > 0) {
-      const files = uploadedPhotos.map((p) => p.file);
-      const uploadResult = await uploadPhotos({
-        sessionId: appState.sessionId,
-        files,
-      });
-      console.log("Photos uploaded:", uploadResult);
-    }
+    const files = uploadedPhotos.map((p) => p.file);
 
     // Update button
     if (submitBtn) {
-      submitBtn.innerHTML = '<span class="loading-dots">Finishing<span>.</span><span>.</span><span>.</span></span>';
+      submitBtn.innerHTML = '<span class="loading-dots">Sending<span>.</span><span>.</span><span>.</span></span>';
     }
 
-    // Finalize
+    // Finalize (email-only photo delivery; backend does not need to persist uploads)
     const result = await finalize({
       sessionId: appState.sessionId,
       contact: {}, // Contact info was collected in chat
+      files,
     });
 
     console.log("Finalized:", result);

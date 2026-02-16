@@ -145,12 +145,32 @@ export async function uploadPhotos({ sessionId, files }) {
 /**
  * Finalize the intake and send notifications
  */
-export async function finalize({ sessionId, contact }) {
-  const res = await fetch(`${API_URL}/api/finalize`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ sessionId, contact }),
-  });
+export async function finalize({ sessionId, contact, files = [] }) {
+  let res;
+
+  if (files && files.length > 0) {
+    const formData = new FormData();
+    formData.append("sessionId", sessionId);
+
+    if (contact?.name) formData.append("contact_name", contact.name);
+    if (contact?.phone) formData.append("contact_phone", contact.phone);
+    if (contact?.email) formData.append("contact_email", contact.email);
+
+    for (const file of files) {
+      formData.append("photos", file);
+    }
+
+    res = await fetch(`${API_URL}/api/finalize`, {
+      method: "POST",
+      body: formData,
+    });
+  } else {
+    res = await fetch(`${API_URL}/api/finalize`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId, contact }),
+    });
+  }
 
   if (!res.ok) {
     const text = await res.text();

@@ -40,7 +40,19 @@ const serviceLabels: Record<string, string> = {
 // ----------------------
 // EMAIL: Send via Gmail
 // ----------------------
-async function sendEmail(to: string, subject: string, html: string, text: string): Promise<boolean> {
+export type EmailAttachment = {
+  filename: string;
+  content: Buffer;
+  contentType?: string;
+};
+
+async function sendEmail(
+  to: string,
+  subject: string,
+  html: string,
+  text: string,
+  attachments: EmailAttachment[] = []
+): Promise<boolean> {
   console.log(`[Email] Sending to ${to}: ${subject}`);
 
   if (!GMAIL_USER || !GMAIL_APP_PASSWORD) {
@@ -66,6 +78,11 @@ async function sendEmail(to: string, subject: string, html: string, text: string
       subject,
       html,
       text,
+      attachments: attachments.map((a) => ({
+        filename: a.filename,
+        content: a.content,
+        contentType: a.contentType,
+      })),
     });
     console.log("[Email] Sent successfully via Gmail");
     return true;
@@ -122,7 +139,7 @@ async function sendSMS(to: string, body: string): Promise<boolean> {
 // ----------------------
 // BUILD OWNER EMAIL HTML
 // ----------------------
-function buildOwnerEmailHtml(session: SessionState): string {
+function buildOwnerEmailHtml(session: SessionState, attachmentCount = 0): string {
   const estimate = session.estimate;
   const contact = session.contact;
   const serviceType = serviceLabels[session.service_type || "other"];
@@ -136,7 +153,9 @@ function buildOwnerEmailHtml(session: SessionState): string {
     ? photoUrls.map(url =>
         `<a href="${APP_URL}${url}" target="_blank"><img src="${APP_URL}${url}" width="150" style="margin: 4px; border-radius: 8px;"></a>`
       ).join("")
-    : "<p>No photos uploaded</p>";
+    : (attachmentCount > 0
+      ? `<p>${attachmentCount} photo(s) attached to this email (not persisted on server).</p>`
+      : "<p>No photos uploaded</p>");
 
   const driversHtml = estimate?.drivers.length
     ? `<ul>${estimate.drivers.map(d => `<li>${d}</li>`).join("")}</ul>`
@@ -211,7 +230,7 @@ function buildOwnerEmailHtml(session: SessionState): string {
     </div>
 
     <div class="section">
-      <div class="label">Photos (${photoUrls.length})</div>
+      <div class="label">Photos (${photoUrls.length || attachmentCount})</div>
       <div class="photos">${photosHtml}</div>
     </div>
 
@@ -230,7 +249,7 @@ function buildOwnerEmailHtml(session: SessionState): string {
 // ----------------------
 // BUILD PLAIN TEXT EMAIL
 // ----------------------
-function buildOwnerEmailText(session: SessionState): string {
+function buildOwnerEmailText(session: SessionState, attachmentCount = 0): string {
   const estimate = session.estimate;
   const contact = session.contact;
   const serviceType = serviceLabels[session.service_type || "other"];
@@ -265,17 +284,22 @@ SLOPE: ${session.access.slope || "Not specified"}
 POWER LINES: ${session.hazards.power_lines ? "YES" : "No"}
 NEAR STRUCTURES: ${session.hazards.structures_nearby ? "YES" : "No"}
 
-PHOTOS (${photoUrls.length}):
+PHOTOS (${photoUrls.length || attachmentCount}):
 ${photoUrls.length > 0
     ? photoUrls.map(url => `  ${APP_URL}${url}`).join("\n")
-    : "  No photos uploaded"}
+    : (attachmentCount > 0
+      ? `  ${attachmentCount} photo(s) attached to this email (not persisted on server)`
+      : "  No photos uploaded")}
   `.trim();
 }
 
 // ----------------------
 // NOTIFY OWNER (Email)
 // ----------------------
-export async function notifyOwnerEmail(session: SessionState): Promise<boolean> {
+export async function notifyOwnerEmail(
+  session: SessionState,
+  attachments: EmailAttachment[] = []
+): Promise<boolean> {
   const serviceType = serviceLabels[session.service_type || "other"];
   const estimate = session.estimate;
   const estimateRange = estimate
@@ -287,8 +311,9 @@ export async function notifyOwnerEmail(session: SessionState): Promise<boolean> 
   return sendEmail(
     OWNER_EMAIL,
     subject,
-    buildOwnerEmailHtml(session),
-    buildOwnerEmailText(session)
+    buildOwnerEmailHtml(session, attachments.length),
+    buildOwnerEmailText(session, attachments.length),
+    attachments
   );
 }
 
@@ -358,9 +383,12 @@ export async function sendBookingConfirmation(session: SessionState, bookingLink
 // ----------------------
 // COMBINED: Notify all parties
 // ----------------------
-export async function notifyAll(session: SessionState): Promise<{ emailSent: boolean; smsSent: boolean }> {
+export async function notifyAll(
+  session: SessionState,
+  options?: { emailAttachments?: EmailAttachment[] }
+): Promise<{ emailSent: boolean; smsSent: boolean }> {
   const [emailSent, smsSent] = await Promise.all([
-    notifyOwnerEmail(session),
+    notifyOwnerEmail(session, options?.emailAttachments || []),
     notifyOwnerSMS(session),
   ]);
 
