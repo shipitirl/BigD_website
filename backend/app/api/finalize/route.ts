@@ -5,7 +5,6 @@ import { z } from "zod";
 import { loadSession, saveSession } from "@/lib/utils";
 import { calculateEstimate, createNewSession } from "@/lib/chatbot";
 import { notifyAll, sendEstimateToCustomer, type EmailAttachment } from "@/lib/notifications";
-import { syncToHubSpot } from "@/lib/hubspot";
 import type { FinalizeRequestBody, FinalizeResponseBody } from "@/lib/types";
 import type { SessionState } from "@/lib/session";
 
@@ -24,7 +23,6 @@ const FinalizeSchema = z.object({
 // Track finalized sessions for idempotency
 const finalizedSessions = new Set<string>();
 const ENABLE_NATIVE_NOTIFICATIONS = process.env.ENABLE_NATIVE_NOTIFICATIONS === "true";
-const ENABLE_HUBSPOT_SYNC = process.env.ENABLE_HUBSPOT_SYNC === "true";
 const NOTIFY_TIMEOUT_MS = Number(process.env.NOTIFY_TIMEOUT_MS || 20000);
 
 // ----------------------
@@ -189,28 +187,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Optional CRM sync (off by default for Zapier-first workflow)
-    let hubspotResult: { success: boolean; dealId?: string; contactId?: string } = { success: false };
-    if (ENABLE_HUBSPOT_SYNC) {
-      const result = await syncToHubSpot(session);
-      hubspotResult = { success: result.success, dealId: result.dealId, contactId: result.contactId };
-      if (result.success && result.dealId) {
-        // Store HubSpot deal ID in session for future updates
-        session.hubspot_deal_id = result.dealId;
-        session.hubspot_contact_id = result.contactId;
-        await saveSession(sessionId, session);
-      }
-    } else {
-      console.log("[Finalize] HubSpot sync skipped (ENABLE_HUBSPOT_SYNC != true)");
-    }
-
     // Mark as finalized for idempotency
     finalizedSessions.add(sessionId);
 
     console.log(
       `[Finalize] Session ${sessionId} finalized. ` +
-      `Email: ${emailSent}, Owner SMS: ${smsSent}, Customer SMS: ${customerSmsSent}, ` +
-      `HubSpot: ${hubspotResult.success ? hubspotResult.dealId || "synced" : "skipped/failed"}`
+      `Email: ${emailSent}, Owner SMS: ${smsSent}, Customer SMS: ${customerSmsSent}`
     );
 
     const response: FinalizeResponseBody = {
@@ -219,11 +201,6 @@ export async function POST(request: NextRequest) {
       estimate: session.estimate,
       emailSent,
       smsSent: smsSent || customerSmsSent,
-      hubspot: {
-        synced: hubspotResult.success,
-        dealId: hubspotResult.dealId,
-        contactId: hubspotResult.contactId,
-      },
     };
 
     return NextResponse.json(response, {

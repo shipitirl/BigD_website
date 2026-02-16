@@ -118,10 +118,6 @@ export interface SessionState {
   conversation_memory: string | null;
   flow_events: FlowEvent[];
 
-  // CRM tracking (optional - populated after finalization)
-  hubspot_deal_id?: string;
-  hubspot_contact_id?: string;
-
   // Outcome tracking (populated when deal closes)
   actual_amount?: number;
   lost_reason?: string;

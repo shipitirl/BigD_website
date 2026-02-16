@@ -69,9 +69,4 @@ export interface FinalizeResponseBody {
   estimate?: Estimate;
   emailSent: boolean;
   smsSent: boolean;
-  hubspot?: {
-    synced: boolean;
-    dealId?: string;
-    contactId?: string;
-  };
 }
