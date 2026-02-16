@@ -104,6 +104,12 @@ export async function POST(req: Request) {
   await saveSession(sessionId, result.updatedState);
 
   // NOTE: Estimate is NOT sent to customer - it's owner-only (sent via email on finalize)
+  const exposeDebug = process.env.EXPOSE_DEBUG_CHAT === "true";
+
+  // Never leak internal debug fields in normal API responses.
+  const safeState = { ...(result.updatedState as any) };
+  delete safeState._debug_error;
+
   const response: ChatResponseBody & { state: typeof result.updatedState; debug?: string } = {
     sessionId,
     assistantMessage: result.assistantMessage,
@@ -119,9 +125,8 @@ export async function POST(req: Request) {
       hasPhotos: result.updatedState.photos_uploaded,
     },
     // Full state for debugging/testing (includes internal estimate)
-    state: result.updatedState,
-    // Debug info
-    debug: result.debug,
+    state: safeState,
+    ...(exposeDebug && result.debug ? { debug: result.debug } : {}),
   };
 
   return NextResponse.json(response, {

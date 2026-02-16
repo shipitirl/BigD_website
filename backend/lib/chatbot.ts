@@ -41,6 +41,13 @@ function clip(text: string, max = 280): string {
   return text.length <= max ? text : `${text.slice(0, max - 3)}...`;
 }
 
+function sanitizeSensitive(text: string): string {
+  // Redact OpenAI-style API keys if they appear in error text/logs
+  return text
+    .replace(/sk-[A-Za-z0-9_\-]{12,}/g, "sk-***REDACTED***")
+    .replace(/Bearer\s+sk-[A-Za-z0-9_\-]{12,}/gi, "Bearer sk-***REDACTED***");
+}
+
 function pushFlowEvent(state: SessionState, kind: 'user' | 'assistant' | 'state_update' | 'status', note: string): void {
   state.flow_events.push({ at: new Date().toISOString(), kind, note: clip(note, 320) });
   if (state.flow_events.length > 40) {
@@ -654,13 +661,14 @@ export async function runChatTurn(state: SessionState, userMessage: string) {
 
   } catch (err: any) {
     console.error("LLM Error:", err);
-    const errMsg = err?.message || err?.toString() || "Unknown error";
+    const errMsgRaw = err?.message || err?.toString() || "Unknown error";
+    const errMsg = sanitizeSensitive(String(errMsgRaw));
     const errType = err?.constructor?.name || "Error";
     console.error(`[LLM] Error type: ${errType}, message: ${errMsg}`);
     if (err?.response?.data) {
-      console.error("[LLM] Response data:", JSON.stringify(err.response.data));
+      console.error("[LLM] Response data:", sanitizeSensitive(JSON.stringify(err.response.data)));
     }
-    // Add debug info to state for response
+    // Add debug info to state for response (sanitized)
     (state as any)._debug_error = `ERR: ${errType} - ${errMsg}`;
     // Get provider for error message
     const { provider, model } = getLLMConfig();
@@ -1013,17 +1021,20 @@ export function createNewSession(sessionId: string): SessionState {
 // READINESS CHECKERS
 // ----------------------
 function isReadyForPhotos(state: SessionState): boolean {
-  // Ready for photos when we have:
-  // 1. Job info (service type, zip, tree count)
-  // 2. Basic details (power lines, access location asked)
-  // 3. Contact info (name, phone, email required BEFORE photos)
+  // Ready for photos only when the required intake schema is fully collected.
+  const backyardGateCaptured =
+    state.access.location !== 'backyard' || state.access.gate_width_ft !== null;
+
   return !!(
     state.zip &&
     state.service_type &&
     state.tree_count !== null &&
-    (state.hazards.power_lines !== null || state.questions_asked?.includes('power_lines')) &&
-    (state.access.location !== null || state.questions_asked?.includes('access_location')) &&
-    (state.access.slope !== null || state.questions_asked?.includes('slope')) &&
+    state.haul_away !== null &&
+    state.access.location !== null &&
+    state.access.slope !== null &&
+    backyardGateCaptured &&
+    state.hazards.power_lines !== null &&
+    state.hazards.structures_nearby !== null &&
     !!state.contact?.name &&
     !!state.contact?.phone &&
     !!state.contact?.email &&

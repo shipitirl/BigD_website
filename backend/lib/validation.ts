@@ -422,6 +422,44 @@ export function validateLLMPatch(
       warnings.push('phone: invalid format, ignored');
     }
   }
+
+  // Validate nested contact phone if present
+  if (boundedPatch.contact && typeof boundedPatch.contact === 'object') {
+    const c = boundedPatch.contact as Record<string, unknown>;
+    if ('phone' in c && typeof c.phone === 'string') {
+      const digits = c.phone.replace(/\D/g, '');
+      if (digits.length === 10) c.phone = digits;
+      else if (digits.length === 11 && digits.startsWith('1')) c.phone = digits.slice(1);
+      else {
+        delete c.phone;
+        warnings.push('contact.phone: invalid format, ignored');
+      }
+    }
+  }
+
+  // Validate email format (root + nested contact)
+  const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+
+  if ('email' in boundedPatch && typeof boundedPatch.email === 'string') {
+    const email = boundedPatch.email.trim().toLowerCase();
+    if (emailRegex.test(email)) boundedPatch.email = email;
+    else {
+      delete boundedPatch.email;
+      warnings.push('email: invalid format, ignored');
+    }
+  }
+
+  if (boundedPatch.contact && typeof boundedPatch.contact === 'object') {
+    const c = boundedPatch.contact as Record<string, unknown>;
+    if ('email' in c && typeof c.email === 'string') {
+      const email = c.email.trim().toLowerCase();
+      if (emailRegex.test(email)) c.email = email;
+      else {
+        delete c.email;
+        warnings.push('contact.email: invalid format, ignored');
+      }
+    }
+  }
   
   // Final schema validation
   const parsed = patchSchema.safeParse(boundedPatch);
