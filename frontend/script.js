@@ -121,6 +121,8 @@ function closeChat() {
     resultSection?.classList.add("hidden");
     chatInputArea?.classList.remove("hidden");
     uploadedPhotos = [];
+    // Ensure a previous in-flight/failed request does not leave UI stuck
+    setChatBusy(false);
   }, 300);
 }
 
@@ -250,6 +252,7 @@ async function handleHeroSubmit() {
     appState.messages = [];
     messagesEl.innerHTML = "";
     uploadedPhotos = [];
+    setChatBusy(false);
 
     openChat();
     await handleSubmit(value);
