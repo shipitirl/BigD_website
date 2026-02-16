@@ -20,13 +20,22 @@ let uploadedPhotos = [];
 // ----------------------
 // RENDERING
 // ----------------------
+function normalizeForDisplay(text) {
+  // Normalize common "newline markers" into real newlines before HTML escaping.
+  // Some models output "/n" or literal "\\n" instead of an actual newline.
+  return String(text)
+    .replace(/\r\n/g, "\n")
+    .replace(/\\n/g, "\n")
+    .replace(/\/n/g, "\n");
+}
+
 function renderMessage(role, content, animate = true) {
   const div = document.createElement("div");
   div.className = `chat-message ${role === "user" ? "user" : "ai"}`;
   if (!animate) div.style.animation = "none";
 
   // Handle markdown-style formatting
-  const formattedContent = escapeHtml(content)
+  const formattedContent = escapeHtml(normalizeForDisplay(content))
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
     .replace(/\n\* /g, "<br>• ")
     .replace(/\n/g, "<br>");
@@ -155,7 +164,7 @@ async function handleSubmit(userText) {
         onChunk: (chunk) => {
           fullMessage += chunk;
           // Format as we stream
-          const formatted = escapeHtml(fullMessage)
+          const formatted = escapeHtml(normalizeForDisplay(fullMessage))
             .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
             .replace(/\n\* /g, "<br>• ")
             .replace(/\n/g, "<br>");

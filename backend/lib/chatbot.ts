@@ -67,6 +67,15 @@ function stripCodeFence(text: string): string {
   return clean;
 }
 
+function normalizeAssistantText(text: string): string {
+  // Normalize common "newline markers" into real newlines for UI rendering.
+  // Some models mistakenly output "/n" instead of "\n", and some gateways double-escape.
+  return text
+    .replace(/\r\n/g, "\n")
+    .replace(/\\n/g, "\n")
+    .replace(/\/n/g, "\n");
+}
+
 // Some providers prepend reasoning text before the JSON payload.
 // Scan brace-delimited segments and return the first parsable JSON object.
 function extractParsableJSONObject(text: string): string | null {
@@ -270,6 +279,7 @@ function generateSystemPrompt(state: SessionState): string {
   - After extracting all info, acknowledge what you understood (e.g., "Got it - 3 trees for removal in the backyard at 75201, with power lines nearby.")
   - Then ask ONLY for the remaining MISSING details (fields that are null in the Current Session State), ONE or TWO at a time.
   - Keep "assistant_message" concise (prefer < 450 characters) and keep "next_questions" to at most 2 short questions.
+  - Do NOT use "/n" to indicate new lines. Use real newline characters in assistant_message (or just write a single paragraph).
   - CRITICAL STATE INTERPRETATION:
     * null = NOT ASKED YET (you should ask)
     * false = USER SAID "NO" (do NOT re-ask!)
@@ -575,7 +585,7 @@ export async function runChatTurn(state: SessionState, userMessage: string) {
 
       // 2. Set Response
       if (result.assistant_message) {
-        assistantMessage = result.assistant_message;
+        assistantMessage = normalizeAssistantText(result.assistant_message);
       }
       nextQuestions = result.next_questions || [];
       memoryNote = result.memory_note;
@@ -650,6 +660,7 @@ export async function runChatTurn(state: SessionState, userMessage: string) {
     state.status = "collecting";
   }
 
+  assistantMessage = normalizeAssistantText(assistantMessage);
   mergeConversationMemory(state, userMessage, assistantMessage, memoryNote);
   pushFlowEvent(state, 'assistant', assistantMessage);
   pushFlowEvent(state, 'status', `status=${state.status}`);
@@ -805,9 +816,10 @@ export async function* streamChatTurn(
       }
 
       const finalAssistant = parsed?.assistant_message || "I'm having trouble responding right now. Please try again.";
+      const normalizedFinal = normalizeAssistantText(finalAssistant);
       // Yield in small bursts so the UI isn't stuck waiting for a single big chunk.
-      for (let i = 0; i < finalAssistant.length; i += 60) {
-        const part = finalAssistant.slice(i, i + 60);
+      for (let i = 0; i < normalizedFinal.length; i += 60) {
+        const part = normalizedFinal.slice(i, i + 60);
         assistantMessage += part;
         yield part;
       }
@@ -834,7 +846,7 @@ export async function* streamChatTurn(
         fullContent += content;
 
         // Extract and yield assistant_message content incrementally
-        const extracted = extractor.feed(content);
+        const extracted = normalizeAssistantText(extractor.feed(content));
         if (extracted) {
           assistantMessage += extracted;
           yield extracted;
