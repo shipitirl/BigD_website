@@ -46,7 +46,7 @@ export type EmailAttachment = {
   contentType?: string;
 };
 
-const EMAIL_TIMEOUT_MS = Number(process.env.EMAIL_TIMEOUT_MS || 15000);
+const EMAIL_TIMEOUT_MS = Number(process.env.EMAIL_TIMEOUT_MS || 60000);
 const SMS_TIMEOUT_MS = Number(process.env.SMS_TIMEOUT_MS || 12000);
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
