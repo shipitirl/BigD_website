@@ -187,9 +187,11 @@ async function handleSubmit(userText) {
           appState.sessionId = data.sessionId;
           appState.messages.push({ role: "assistant", content: fullMessage });
 
-          // Handle ready for photos
-          if (data.readyForPhotos) {
-            setTimeout(() => transitionToPhotos(), 500);
+          // Handle ready for photos (metadata + text fallback)
+          const shouldShowUploader =
+            data.readyForPhotos || /upload\s+(a\s+few\s+)?photos?/i.test(fullMessage);
+          if (shouldShowUploader) {
+            setTimeout(() => transitionToPhotos(), 300);
           }
 
           setChatBusy(false);
@@ -219,8 +221,10 @@ async function handleSubmit(userText) {
       appState.messages.push({ role: "assistant", content: data.assistantMessage });
       renderMessage("assistant", data.assistantMessage);
 
-      if (data.readyForPhotos) {
-        setTimeout(() => transitionToPhotos(), 500);
+      const shouldShowUploader =
+        data.readyForPhotos || /upload\s+(a\s+few\s+)?photos?/i.test(data.assistantMessage || "");
+      if (shouldShowUploader) {
+        setTimeout(() => transitionToPhotos(), 300);
       }
       setChatBusy(false);
     } catch (err) {

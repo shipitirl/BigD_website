@@ -232,27 +232,24 @@ export function getMissingFields(state: SessionState): string[] {
   // P8: structures
   if (state.hazards.structures_nearby === null) missing.push('structures');
 
-  // P10: Contact Info (Must be collected BEFORE photos now)
+  // P10: Contact info required before photos (short flow):
+  // Name + phone + street address are required.
+  // Email and city are optional at intake.
   if (!state.contact.name) missing.push('contact_name');
   if (!state.contact.phone) missing.push('contact_phone');
-  if (!state.contact.email) missing.push('contact_email');
   if (!state.contact.address) missing.push('contact_address');
-  if (!state.contact.city) missing.push('contact_city');
 
   return missing;
 }
 
 export function isReadyForEstimate(state: SessionState): boolean {
-  // Need: service_type, zip, tree_count
-  // Contact info is now required earlier in the flow, so we check that too.
+  // Need: job essentials + core contact fields captured.
   return state.service_type !== null && 
          state.tree_count !== null && 
          state.zip !== null && 
          !!state.contact.name && 
          !!state.contact.phone && 
-         !!state.contact.email &&
-         !!state.contact.address &&
-         !!state.contact.city;
+         !!state.contact.address;
 }
 
 // ----------------------

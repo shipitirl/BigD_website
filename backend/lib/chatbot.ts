@@ -301,7 +301,7 @@ function generateSystemPrompt(state: SessionState): string {
   6. Structures Nearby (Yes/No)
   7. Slope (Easy/Moderate/Steep)
   8. Haul Away (Yes/No)
-  9. Contact Name, Phone, Email, Address, and City (Ask these LAST, after job details, BUT BEFORE PHOTOS).
+  9. Contact Name, Phone, and Street Address (Ask these LAST, after job details, BUT BEFORE PHOTOS). Email/City are optional.
 
   Current Session State: ${stateJson}
   Definitions: ${definitions}
@@ -356,14 +356,14 @@ function generateSystemPrompt(state: SessionState): string {
     * etc.
   - PHRASING RULE: When asking for tree count (ONLY if tree_count is null), use: "How many trees and/or stumps seem to have issues?"
   - If the user asks a question, answer it briefly.
-  - If you have all job details (1-8), ask for Contact Name, Phone, AND Email.
+  - If you have all job details (1-8), ask for Contact Name, Phone, and Street Address (email optional).
   - EMAIL VALIDATION: An email is valid if it matches this pattern: <local>@<domain>.<tld> where:
     * local part: letters, numbers, dots, underscores, hyphens (e.g., "john.doe", "user123")
     * domain: letters, numbers, hyphens (e.g., "gmail", "company-name")
     * tld: 2+ letters (e.g., "com", "org", "co.uk")
     * VALID examples: john@gmail.com, user.name@company.org, test123@mail.co.uk
     * INVALID examples: john@ (no domain), @gmail.com (no local), john@.com (empty domain), john@com (no TLD dot)
-  - ONLY when you have Name, Phone, valid Email, Address, and City, should you say "READY_FOR_PHOTOS" in your thought process.
+  - ONLY when you have Name, Phone, and Street Address should you say "READY_FOR_PHOTOS" in your thought process (email/city can be captured later).
   - Tell the user: "Thanks! Now I just need to see the trees. Please upload a few photos so Corey can give you an accurate estimate."
 
   CRITICAL: You must include "updated_fields" in your JSON response for ANY new information you identify.
@@ -1037,9 +1037,7 @@ function isReadyForPhotos(state: SessionState): boolean {
     state.hazards.structures_nearby !== null &&
     !!state.contact?.name &&
     !!state.contact?.phone &&
-    !!state.contact?.email &&
-    !!state.contact?.address &&
-    !!state.contact?.city
+    !!state.contact?.address
   );
 }
 
