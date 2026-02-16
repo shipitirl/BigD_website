@@ -46,6 +46,24 @@ export type EmailAttachment = {
   contentType?: string;
 };
 
+const EMAIL_TIMEOUT_MS = Number(process.env.EMAIL_TIMEOUT_MS || 15000);
+const SMS_TIMEOUT_MS = Number(process.env.SMS_TIMEOUT_MS || 12000);
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(`${label} timeout after ${timeoutMs}ms`)), timeoutMs);
+    promise
+      .then((v) => {
+        clearTimeout(t);
+        resolve(v);
+      })
+      .catch((e) => {
+        clearTimeout(t);
+        reject(e);
+      });
+  });
+}
+
 async function sendEmail(
   to: string,
   subject: string,
@@ -69,21 +87,28 @@ async function sendEmail(
       user: GMAIL_USER,
       pass: GMAIL_APP_PASSWORD,
     },
+    connectionTimeout: EMAIL_TIMEOUT_MS,
+    greetingTimeout: EMAIL_TIMEOUT_MS,
+    socketTimeout: EMAIL_TIMEOUT_MS,
   });
 
   try {
-    await transporter.sendMail({
-      from: `"Big D's Tree Service" <${GMAIL_USER}>`,
-      to,
-      subject,
-      html,
-      text,
-      attachments: attachments.map((a) => ({
-        filename: a.filename,
-        content: a.content,
-        contentType: a.contentType,
-      })),
-    });
+    await withTimeout(
+      transporter.sendMail({
+        from: `"Big D's Tree Service" <${GMAIL_USER}>`,
+        to,
+        subject,
+        html,
+        text,
+        attachments: attachments.map((a) => ({
+          filename: a.filename,
+          content: a.content,
+          contentType: a.contentType,
+        })),
+      }),
+      EMAIL_TIMEOUT_MS,
+      "email send"
+    );
     console.log("[Email] Sent successfully via Gmail");
     return true;
   } catch (err) {
@@ -120,6 +145,7 @@ async function sendSMS(to: string, body: string): Promise<boolean> {
         From: TWILIO_PHONE_NUMBER,
         Body: body,
       }),
+      signal: AbortSignal.timeout(SMS_TIMEOUT_MS),
     });
 
     if (!response.ok) {
@@ -387,10 +413,20 @@ export async function notifyAll(
   session: SessionState,
   options?: { emailAttachments?: EmailAttachment[] }
 ): Promise<{ emailSent: boolean; smsSent: boolean }> {
-  const [emailSent, smsSent] = await Promise.all([
+  const [emailResult, smsResult] = await Promise.allSettled([
     notifyOwnerEmail(session, options?.emailAttachments || []),
     notifyOwnerSMS(session),
   ]);
+
+  const emailSent = emailResult.status === "fulfilled" ? emailResult.value : false;
+  const smsSent = smsResult.status === "fulfilled" ? smsResult.value : false;
+
+  if (emailResult.status === "rejected") {
+    console.error("[NotifyAll] Email branch failed:", emailResult.reason);
+  }
+  if (smsResult.status === "rejected") {
+    console.error("[NotifyAll] SMS branch failed:", smsResult.reason);
+  }
 
   return { emailSent, smsSent };
 }

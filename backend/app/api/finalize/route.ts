@@ -25,6 +25,7 @@ const FinalizeSchema = z.object({
 const finalizedSessions = new Set<string>();
 const ENABLE_NATIVE_NOTIFICATIONS = process.env.ENABLE_NATIVE_NOTIFICATIONS === "true";
 const ENABLE_HUBSPOT_SYNC = process.env.ENABLE_HUBSPOT_SYNC === "true";
+const NOTIFY_TIMEOUT_MS = Number(process.env.NOTIFY_TIMEOUT_MS || 20000);
 
 // ----------------------
 // POST /api/finalize
@@ -165,12 +166,27 @@ export async function POST(request: NextRequest) {
     let smsSent = false;
     let customerSmsSent = false;
 
-    const notificationResult = await notifyAll(session, { emailAttachments });
-    emailSent = notificationResult.emailSent;
-    smsSent = notificationResult.smsSent;
+    console.log(`[Finalize] ${sessionId} notifyAll start`);
+    try {
+      const notificationResult = await Promise.race([
+        notifyAll(session, { emailAttachments }),
+        new Promise<{ emailSent: boolean; smsSent: boolean }>((resolve) =>
+          setTimeout(() => resolve({ emailSent: false, smsSent: false }), NOTIFY_TIMEOUT_MS)
+        ),
+      ]);
+      emailSent = notificationResult.emailSent;
+      smsSent = notificationResult.smsSent;
+    } catch (notifyErr) {
+      console.error(`[Finalize] ${sessionId} notifyAll error:`, notifyErr);
+    }
+    console.log(`[Finalize] ${sessionId} notifyAll done emailSent=${emailSent} smsSent=${smsSent}`);
 
     if (session.contact.phone) {
-      customerSmsSent = await sendEstimateToCustomer(session);
+      try {
+        customerSmsSent = await sendEstimateToCustomer(session);
+      } catch (customerSmsErr) {
+        console.error(`[Finalize] ${sessionId} customer SMS error:`, customerSmsErr);
+      }
     }
 
     // Optional CRM sync (off by default for Zapier-first workflow)
