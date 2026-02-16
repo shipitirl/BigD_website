@@ -277,7 +277,8 @@ function generateSystemPrompt(state: SessionState): string {
 
   CONVERSATIONAL STYLE:
   - After extracting all info, acknowledge what you understood (e.g., "Got it - 3 trees for removal in the backyard at 75201, with power lines nearby.")
-  - Then ask ONLY for the remaining MISSING details (fields that are null in the Current Session State), ONE or TWO at a time.
+  - Then ask ONLY for the remaining MISSING details (fields that are null in the Current Session State).
+  - Ask ONLY ONE question at a time (do not bundle multiple questions in one message).
   - Keep "assistant_message" concise (prefer < 450 characters) and keep "next_questions" to at most 2 short questions.
   - Do NOT use "/n" to indicate new lines. Use real newline characters in assistant_message (or just write a single paragraph).
   - CRITICAL STATE INTERPRETATION:

@@ -16,6 +16,14 @@ const chatInputArea = document.getElementById("chatInputArea");
 
 // Photo upload state
 let uploadedPhotos = [];
+let isChatBusy = false;
+let sendBtnEl = null;
+
+function setChatBusy(busy) {
+  isChatBusy = busy;
+  if (chatInput) chatInput.disabled = busy;
+  if (sendBtnEl) sendBtnEl.disabled = busy;
+}
 
 // ----------------------
 // RENDERING
@@ -147,6 +155,8 @@ function transitionToResult(result) {
 // ----------------------
 async function handleSubmit(userText) {
   if (!userText.trim()) return;
+  if (isChatBusy) return;
+  setChatBusy(true);
 
   // Add user message
   appState.messages.push({ role: "user", content: userText });
@@ -179,14 +189,18 @@ async function handleSubmit(userText) {
           if (data.readyForPhotos) {
             setTimeout(() => transitionToPhotos(), 500);
           }
+
+          setChatBusy(false);
         },
         onError: (err) => {
           console.error("Stream error:", err);
           bubble.innerHTML = "Sorry - something went wrong. Please try again.";
+          setChatBusy(false);
         },
       });
     } catch (err) {
       console.error("Chat error:", err);
+      setChatBusy(false);
     }
   } else {
     // Non-streaming approach
@@ -206,10 +220,12 @@ async function handleSubmit(userText) {
       if (data.readyForPhotos) {
         setTimeout(() => transitionToPhotos(), 500);
       }
+      setChatBusy(false);
     } catch (err) {
       hideTyping();
       renderMessage("assistant", "Sorry - something went wrong. Please try again.");
       console.error("Chat error:", err);
+      setChatBusy(false);
     }
   }
 }
@@ -249,6 +265,7 @@ async function handleHeroSubmit() {
 // CHAT INPUT SUBMIT
 // ----------------------
 async function sendUserMessage() {
+  if (isChatBusy) return;
   const value = chatInput?.value.trim();
   if (!value) return;
 
@@ -449,10 +466,8 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // Send button
-  const sendBtn = document.querySelector(".send-btn");
-  if (sendBtn) {
-    sendBtn.addEventListener("click", sendUserMessage);
-  }
+  sendBtnEl = document.querySelector(".send-btn");
+  if (sendBtnEl) sendBtnEl.addEventListener("click", sendUserMessage);
 
   // Photo upload
   initPhotoUpload();
