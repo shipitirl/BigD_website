@@ -1,6 +1,31 @@
 // frontend/ai_service.js
 
-const API_URL = window.ENV?.BACKEND_URL || window.ENV?.API_BASE || "https://bigd-backend.vercel.app";
+function computeApiUrl() {
+  // Allow ad-hoc override for local debugging:
+  // `http://localhost:8082/?api=http://localhost:3001`
+  try {
+    const apiOverride = new URLSearchParams(window.location.search).get("api");
+    if (apiOverride) return apiOverride.replace(/\/+$/, "");
+  } catch {
+    // ignore
+  }
+
+  const envUrl = window.ENV?.BACKEND_URL || window.ENV?.API_BASE;
+  const hostname = window.location?.hostname || "";
+  const isLocalPage = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0";
+
+  // When testing locally, don't let a production `env.js` force traffic to Railway/Vercel.
+  if (isLocalPage) {
+    if (typeof envUrl === "string" && /\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?/i.test(envUrl)) {
+      return envUrl.replace(/\/+$/, "");
+    }
+    return "http://localhost:3001";
+  }
+
+  return (envUrl || "https://bigd-backend.vercel.app").replace(/\/+$/, "");
+}
+
+const API_URL = computeApiUrl();
 
 /**
  * Send a message to the chat API (non-streaming)

@@ -140,9 +140,6 @@ export function getNextQuestion(state: SessionState): Question | null {
     return null; // All required fields collected
   }
 
-  // Track which questions have already been asked to prevent repetition
-  const alreadyAsked = new Set(state.questions_asked || []);
-
   // Map missing field names to question IDs
   // NOTE: service_type is auto-detected, not asked - so not included here
   const fieldToQuestionId: Record<string, string> = {
@@ -169,10 +166,6 @@ export function getNextQuestion(state: SessionState): Question | null {
     const isMissing = missing.some(m => fieldToQuestionId[m] === questionId);
 
     if (isMissing) {
-      // Skip if already asked (even if answer wasn't captured)
-      if (alreadyAsked.has(questionId)) {
-        continue;
-      }
       // Check condition if present
       if (question.condition && !question.condition(state)) {
         continue;

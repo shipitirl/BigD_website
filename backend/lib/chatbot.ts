@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { SessionState, Estimate } from "./session";
 import { createSession } from "./session";
 import { validateLLMPatch, type SanitizedPatch } from "./validation";
+import { getNextQuestion } from "./questions";
 
 // Zod schema for server-side validation
 export const ChatRequestSchema = z.object({
@@ -74,6 +75,59 @@ function normalizeAssistantText(text: string): string {
     .replace(/\r\n/g, "\n")
     .replace(/\\n/g, "\n")
     .replace(/\/n/g, "\n");
+}
+
+function questionMarkCount(text: string): number {
+  return (text.match(/\?/g) || []).length;
+}
+
+function questionPromptCount(text: string): number {
+  const normalized = text
+    .replace(/\r\n/g, "\n")
+    .split(/\n+/)
+    .join(" ")
+    .trim();
+  if (!normalized) return 0;
+
+  const segments = normalized.split(/[.?!]\s+/);
+  const promptLike = /\b(what|how|where|when|why|which|who|do you|are there|would you|can you|could you)\b/i;
+
+  let count = 0;
+  for (const seg of segments) {
+    const s = seg.trim();
+    if (!s) continue;
+    if (s.includes("?") || promptLike.test(s)) count += 1;
+  }
+  return count;
+}
+
+function inferAskedQuestionId(text: string): string | null {
+  const patterns: Array<{ pattern: RegExp; id: string }> = [
+    { pattern: /zip\s*code|what.*zip|your\s*zip/i, id: "zip" },
+    { pattern: /how\s*many\s*tree|tree.*count|number\s*of\s*tree|trees?\/stumps?/i, id: "tree_count" },
+    { pattern: /haul\s*away|debris|take.*away|remove.*material/i, id: "haul_debris" },
+    { pattern: /front\s*yard|backyard|where.*located|work\s*area\s*located/i, id: "access_location" },
+    { pattern: /gate\s*width|how\s*wide.*gate/i, id: "gate_width" },
+    { pattern: /slope|steep|ground\s*condition|wet.*ground/i, id: "slope" },
+    { pattern: /power\s*line|electrical|wire/i, id: "power_lines" },
+    { pattern: /structure|house|garage|fence|building/i, id: "structures" },
+    { pattern: /your\s*name|what.*name/i, id: "contact_name" },
+    { pattern: /phone\s*number|reach\s*you|call\s*you/i, id: "contact_phone" },
+    { pattern: /email\s*address|your\s*email/i, id: "contact_email" },
+    { pattern: /address|street\s*address/i, id: "contact_address" },
+    { pattern: /city/i, id: "contact_city" },
+  ];
+  for (const { pattern, id } of patterns) {
+    if (pattern.test(text)) return id;
+  }
+  return null;
+}
+
+function ackWithoutQuestion(text: string): string {
+  const firstQ = text.indexOf("?");
+  const base = (firstQ >= 0 ? text.slice(0, firstQ) : text).trim();
+  if (!base) return "Got it.";
+  return /[.!]$/.test(base) ? base : `${base}.`;
 }
 
 // Some providers prepend reasoning text before the JSON payload.
@@ -391,8 +445,9 @@ function applyValidatedPatch(state: SessionState, patch: SanitizedPatch, rawFiel
 
   // Handle access.location from raw fields if validation didn't catch it
   if (rawFields.access?.location && !state.access.location) {
-    const loc = String(rawFields.access.location).toLowerCase().replace(" ", "_");
-    state.access.location = loc === 'backyard' ? 'backyard' : 'front_yard';
+    const loc = String(rawFields.access.location).toLowerCase().trim().replace(/\s+/g, "_");
+    if (loc === "backyard" || loc === "back_yard") state.access.location = "backyard";
+    else if (loc === "front_yard" || loc === "frontyard" || loc === "front") state.access.location = "front_yard";
   }
 }
 
@@ -414,14 +469,15 @@ function applyManualExtraction(state: SessionState, u: any): void {
     state.service_type = normalized as SessionState['service_type'];
   }
 
-  if (u.tree_count !== undefined) {
+  if (u.tree_count !== undefined && u.tree_count !== null) {
     state.tree_count = typeof u.tree_count === 'string' ? parseInt(u.tree_count) : u.tree_count;
   }
 
   if (u.access) {
     if (u.access.location) {
-      const loc = String(u.access.location).toLowerCase().replace(" ", "_");
-      state.access.location = loc === 'backyard' ? 'backyard' : 'front_yard';
+      const loc = String(u.access.location).toLowerCase().trim().replace(/\s+/g, "_");
+      if (loc === "backyard" || loc === "back_yard") state.access.location = "backyard";
+      else if (loc === "front_yard" || loc === "frontyard" || loc === "front") state.access.location = "front_yard";
     }
     if (u.access.gate_width_ft !== undefined) {
       state.access.gate_width_ft = typeof u.access.gate_width_ft === 'string'
@@ -435,19 +491,19 @@ function applyManualExtraction(state: SessionState, u: any): void {
   }
 
   if (u.hazards) {
-    if (u.hazards.power_lines !== undefined) {
+    if (u.hazards.power_lines !== undefined && u.hazards.power_lines !== null) {
       state.hazards.power_lines = u.hazards.power_lines === true ||
         String(u.hazards.power_lines).toLowerCase() === 'yes' ||
         String(u.hazards.power_lines).toLowerCase() === 'true';
     }
-    if (u.hazards.structures_nearby !== undefined) {
+    if (u.hazards.structures_nearby !== undefined && u.hazards.structures_nearby !== null) {
       state.hazards.structures_nearby = u.hazards.structures_nearby === true ||
         String(u.hazards.structures_nearby).toLowerCase() === 'yes' ||
         String(u.hazards.structures_nearby).toLowerCase() === 'true';
     }
   }
 
-  if (u.haul_away !== undefined) {
+  if (u.haul_away !== undefined && u.haul_away !== null) {
     if (typeof u.haul_away === 'string') {
       const lower = u.haul_away.toLowerCase();
       state.haul_away = lower === 'unsure' ? 'unsure' : (lower === 'yes' || lower === 'true');
@@ -458,7 +514,9 @@ function applyManualExtraction(state: SessionState, u: any): void {
 
   if (u.urgency) {
     const urgency = String(u.urgency).toLowerCase();
-    state.urgency = (urgency === 'emergency' || urgency === 'urgent') ? 'emergency' : 'normal';
+    if (urgency === "emergency") state.urgency = "emergency";
+    else if (urgency === "urgent") state.urgency = "urgent";
+    else state.urgency = "normal";
   }
 
   if (u.contact) {
@@ -591,34 +649,7 @@ export async function runChatTurn(state: SessionState, userMessage: string) {
       nextQuestions = result.next_questions || [];
       memoryNote = result.memory_note;
 
-      // FIX #1: Track questions asked to prevent repeating questions
-      // Map common question patterns to question IDs
-      if (nextQuestions.length > 0 || result.assistant_message) {
-        const questionPatterns: Array<{ pattern: RegExp; id: string }> = [
-          { pattern: /zip\s*code|what.*zip|your\s*zip/i, id: 'zip' },
-          { pattern: /how\s*many\s*tree|tree.*count|number\s*of\s*tree/i, id: 'tree_count' },
-          { pattern: /haul\s*away|debris|take.*away|remove.*material/i, id: 'haul_debris' },
-          { pattern: /front\s*yard|backyard|where.*located|work\s*area\s*located/i, id: 'access_location' },
-          { pattern: /gate\s*width|how\s*wide.*gate/i, id: 'gate_width' },
-          { pattern: /slope|steep|ground\s*condition|wet.*ground/i, id: 'slope' },
-          { pattern: /power\s*line|electrical|wire/i, id: 'power_lines' },
-          { pattern: /structure|house|garage|fence|building/i, id: 'structures' },
-          { pattern: /your\s*name|what.*name/i, id: 'contact_name' },
-          { pattern: /phone\s*number|reach\s*you|call\s*you/i, id: 'contact_phone' },
-          { pattern: /email\s*address|your\s*email/i, id: 'contact_email' },
-          { pattern: /address|street\s*address/i, id: 'contact_address' },
-          { pattern: /city/i, id: 'contact_city' },
-        ];
-
-        const textToCheck = [...nextQuestions, result.assistant_message || ''].join(' ');
-
-        for (const { pattern, id } of questionPatterns) {
-          if (pattern.test(textToCheck) && !state.questions_asked.includes(id)) {
-            state.questions_asked.push(id);
-            console.log(`[Questions] Marked as asked: ${id}`);
-          }
-        }
-      }
+      // Questions asked tracking is handled after we enforce the canonical next question.
     }
 
   } catch (err: any) {
@@ -659,6 +690,26 @@ export async function runChatTurn(state: SessionState, userMessage: string) {
      }
   } else {
     state.status = "collecting";
+
+    // Server-side flow guardrail:
+    // Ensure we ask exactly one canonical missing-field question, so the bot doesn't stall
+    // or drift into asking already-known fields.
+    const nextQuestion = getNextQuestion(state);
+    if (nextQuestion) {
+      const askedId = inferAskedQuestionId(assistantMessage);
+      const qCount = questionMarkCount(assistantMessage);
+      const qPromptCount = questionPromptCount(assistantMessage);
+      const needsRewrite = qCount !== 1 || qPromptCount !== 1 || askedId !== nextQuestion.id;
+
+      if (needsRewrite) {
+        assistantMessage = `Got it. ${nextQuestion.text}`;
+      }
+
+      if (!state.questions_asked.includes(nextQuestion.id)) {
+        state.questions_asked.push(nextQuestion.id);
+        console.log(`[Questions] Canonical ask: ${nextQuestion.id}`);
+      }
+    }
   }
 
   assistantMessage = normalizeAssistantText(assistantMessage);

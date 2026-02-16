@@ -10,6 +10,7 @@ backend/.sessions/
 backend/uploads/
 *.log
 frontend-*.log
+.pids/
 
 # Dependencies
 node_modules/
