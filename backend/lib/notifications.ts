@@ -46,8 +46,16 @@ export type EmailAttachment = {
   contentType?: string;
 };
 
-const EMAIL_TIMEOUT_MS = Number(process.env.EMAIL_TIMEOUT_MS || 60000);
-const SMS_TIMEOUT_MS = Number(process.env.SMS_TIMEOUT_MS || 12000);
+function envMs(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return Math.floor(parsed);
+}
+
+const EMAIL_TIMEOUT_MS = envMs("EMAIL_TIMEOUT_MS", 12000);
+const SMS_TIMEOUT_MS = envMs("SMS_TIMEOUT_MS", 12000);
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
@@ -71,7 +79,7 @@ async function sendEmail(
   text: string,
   attachments: EmailAttachment[] = []
 ): Promise<boolean> {
-  console.log(`[Email] Sending to ${to}: ${subject}`);
+  console.log(`[Email] Sending to ${to}: ${subject} (timeout=${EMAIL_TIMEOUT_MS}ms)`);
 
   if (!GMAIL_USER || !GMAIL_APP_PASSWORD) {
     console.warn("[Email] Skipped: GMAIL_USER or GMAIL_APP_PASSWORD not set");

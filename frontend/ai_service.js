@@ -155,6 +155,8 @@ export async function finalize({ sessionId, contact, files = [] }) {
     if (contact?.name) formData.append("contact_name", contact.name);
     if (contact?.phone) formData.append("contact_phone", contact.phone);
     if (contact?.email) formData.append("contact_email", contact.email);
+    if (contact?.address) formData.append("contact_address", contact.address);
+    if (contact?.city) formData.append("contact_city", contact.city);
 
     for (const file of files) {
       formData.append("photos", file);

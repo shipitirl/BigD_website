@@ -214,19 +214,8 @@ export function getMissingFields(state: SessionState): string[] {
   // P4: access_location
   if (!state.access.location) missing.push('access_location');
 
-  // P5: gate_width (only for backyard)
-  if (state.access.location === 'backyard' && state.access.gate_width_ft === null) {
-    missing.push('gate_width');
-  }
-
-  // P6: slope
-  if (state.access.slope === null) missing.push('slope');
-
-  // P7: power_lines
-  if (state.hazards.power_lines === null) missing.push('power_lines');
-
-  // P8: structures
-  if (state.hazards.structures_nearby === null) missing.push('structures');
+  // Optional enrichments (not blocking):
+  // gate width, slope, and hazards help pricing confidence, but should not stall flow.
 
   // P10: Contact info required before photos (short flow):
   // Name + phone + street address are required.

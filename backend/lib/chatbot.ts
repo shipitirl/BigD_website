@@ -1021,20 +1021,14 @@ export function createNewSession(sessionId: string): SessionState {
 // READINESS CHECKERS
 // ----------------------
 function isReadyForPhotos(state: SessionState): boolean {
-  // Ready for photos only when the required intake schema is fully collected.
-  const backyardGateCaptured =
-    state.access.location !== 'backyard' || state.access.gate_width_ft !== null;
-
+  // Keep flow moving: require core intake fields only.
+  // Gate width/slope/hazards are useful enrichments, but not blockers.
   return !!(
     state.zip &&
     state.service_type &&
     state.tree_count !== null &&
     state.haul_away !== null &&
     state.access.location !== null &&
-    state.access.slope !== null &&
-    backyardGateCaptured &&
-    state.hazards.power_lines !== null &&
-    state.hazards.structures_nearby !== null &&
     !!state.contact?.name &&
     !!state.contact?.phone &&
     !!state.contact?.address

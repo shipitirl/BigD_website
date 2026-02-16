@@ -23,7 +23,7 @@ const FinalizeSchema = z.object({
 // Track finalized sessions for idempotency
 const finalizedSessions = new Set<string>();
 const ENABLE_NATIVE_NOTIFICATIONS = process.env.ENABLE_NATIVE_NOTIFICATIONS === "true";
-const NOTIFY_TIMEOUT_MS = Number(process.env.NOTIFY_TIMEOUT_MS || 70000);
+const NOTIFY_TIMEOUT_MS = Number(process.env.NOTIFY_TIMEOUT_MS || 15000);
 
 // ----------------------
 // POST /api/finalize
@@ -165,6 +165,7 @@ export async function POST(request: NextRequest) {
     let customerSmsSent = false;
 
     console.log(`[Finalize] ${sessionId} notifyAll start`);
+    const notifyStart = Date.now();
     try {
       const notificationResult = await Promise.race([
         notifyAll(session, { emailAttachments }),
@@ -177,7 +178,9 @@ export async function POST(request: NextRequest) {
     } catch (notifyErr) {
       console.error(`[Finalize] ${sessionId} notifyAll error:`, notifyErr);
     }
-    console.log(`[Finalize] ${sessionId} notifyAll done emailSent=${emailSent} smsSent=${smsSent}`);
+    console.log(
+      `[Finalize] ${sessionId} notifyAll done emailSent=${emailSent} smsSent=${smsSent} in ${Date.now() - notifyStart}ms`
+    );
 
     if (session.contact.phone) {
       try {
