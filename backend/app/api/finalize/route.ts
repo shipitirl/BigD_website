@@ -23,7 +23,7 @@ const FinalizeSchema = z.object({
 // Track finalized sessions for idempotency
 const finalizedSessions = new Set<string>();
 const ENABLE_NATIVE_NOTIFICATIONS = process.env.ENABLE_NATIVE_NOTIFICATIONS === "true";
-const NOTIFY_TIMEOUT_MS = Number(process.env.NOTIFY_TIMEOUT_MS || 15000);
+const NOTIFY_TIMEOUT_MS = Number(process.env.NOTIFY_TIMEOUT_MS || 70000);
 
 // ----------------------
 // POST /api/finalize

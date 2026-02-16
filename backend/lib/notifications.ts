@@ -60,7 +60,7 @@ function envMs(name: string, fallback: number): number {
   return Math.floor(parsed);
 }
 
-const EMAIL_TIMEOUT_MS = envMs("EMAIL_TIMEOUT_MS", 12000);
+const EMAIL_TIMEOUT_MS = envMs("EMAIL_TIMEOUT_MS", 60000);
 const SMS_TIMEOUT_MS = envMs("SMS_TIMEOUT_MS", 12000);
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
@@ -95,40 +95,63 @@ async function sendEmail(
     return false;
   }
 
-  const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-      user: GMAIL_USER,
-      pass: GMAIL_APP_PASSWORD,
-    },
-    connectionTimeout: EMAIL_TIMEOUT_MS,
-    greetingTimeout: EMAIL_TIMEOUT_MS,
-    socketTimeout: EMAIL_TIMEOUT_MS,
-  });
+  const mailPayload = {
+    from: `"Big D's Tree Service" <${GMAIL_USER}>`,
+    to,
+    subject,
+    html,
+    text,
+    attachments: attachments.map((a) => ({
+      filename: a.filename,
+      content: a.content,
+      contentType: a.contentType,
+    })),
+  };
 
-  try {
-    await withTimeout(
-      transporter.sendMail({
-        from: `"Big D's Tree Service" <${GMAIL_USER}>`,
-        to,
-        subject,
-        html,
-        text,
-        attachments: attachments.map((a) => ({
-          filename: a.filename,
-          content: a.content,
-          contentType: a.contentType,
-        })),
-      }),
-      EMAIL_TIMEOUT_MS,
-      "email send"
-    );
-    console.log("[Email] Sent successfully via Gmail");
-    return true;
-  } catch (err) {
-    console.error("[Email] Failed to send:", err);
-    return false;
+  const attempts: Array<{ name: string; transport: any }> = [
+    {
+      name: "gmail-service-465",
+      transport: {
+        service: "gmail",
+        auth: { user: GMAIL_USER, pass: GMAIL_APP_PASSWORD },
+        connectionTimeout: EMAIL_TIMEOUT_MS,
+        greetingTimeout: EMAIL_TIMEOUT_MS,
+        socketTimeout: EMAIL_TIMEOUT_MS,
+      },
+    },
+    {
+      name: "smtp-587-starttls",
+      transport: {
+        host: "smtp.gmail.com",
+        port: 587,
+        secure: false,
+        requireTLS: true,
+        auth: { user: GMAIL_USER, pass: GMAIL_APP_PASSWORD },
+        connectionTimeout: EMAIL_TIMEOUT_MS,
+        greetingTimeout: EMAIL_TIMEOUT_MS,
+        socketTimeout: EMAIL_TIMEOUT_MS,
+        tls: { servername: "smtp.gmail.com" },
+      },
+    },
+  ];
+
+  for (const attempt of attempts) {
+    try {
+      console.log(`[Email] Attempt ${attempt.name} start`);
+      const transporter = nodemailer.createTransport(attempt.transport as any);
+      await withTimeout(
+        transporter.sendMail(mailPayload as any),
+        EMAIL_TIMEOUT_MS,
+        `email send (${attempt.name})`
+      );
+      console.log(`[Email] Sent successfully via ${attempt.name}`);
+      return true;
+    } catch (err) {
+      console.error(`[Email] Attempt ${attempt.name} failed:`, err);
+    }
   }
+
+  return false;
 }
 
 // ----------------------
@@ -363,7 +386,7 @@ export async function notifyOwnerEmail(
 export async function notifyOwnerSMS(session: SessionState): Promise<boolean> {
   if (!OWNER_PHONE) {
     console.log("[SMS] No OWNER_PHONE configured, skipping owner SMS");
-    return true;
+    return false;
   }
 
   const serviceType = serviceLabels[session.service_type || "other"];
