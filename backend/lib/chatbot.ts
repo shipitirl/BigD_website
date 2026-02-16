@@ -12,12 +12,29 @@ export const ChatRequestSchema = z.object({
   stream: z.boolean().optional(),
 });
 
-const LLMResponseSchema = z.object({
-  assistant_message: z.string().default(""),
-  next_questions: z.array(z.string()).default([]),
-  updated_fields: z.record(z.any()).optional(),
-  memory_note: z.string().optional(),
-});
+const UpdatedFieldsSchema = z.object({}).passthrough().optional();
+const LLMResponseSchema = z
+  .object({
+    assistant_message: z.string().default(""),
+    next_questions: z.array(z.string()).default([]),
+    updated_fields: UpdatedFieldsSchema,
+    memory_note: z.string().optional(),
+  })
+  .passthrough();
+
+function envInt(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const val = Number.parseInt(raw, 10);
+  return Number.isFinite(val) ? val : fallback;
+}
+
+function envFloat(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const val = Number.parseFloat(raw);
+  return Number.isFinite(val) ? val : fallback;
+}
 
 function clip(text: string, max = 280): string {
   return text.length <= max ? text : `${text.slice(0, max - 3)}...`;
@@ -99,13 +116,38 @@ function extractParsableJSONObject(text: string): string | null {
 
 import OpenAI from "openai";
 
+function cleanApiKey(raw?: string): string | undefined {
+  if (!raw) return undefined;
+  let s = raw.trim();
+  // Remove accidental quoting
+  if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
+    s = s.slice(1, -1).trim();
+  }
+  // Remove accidental Bearer prefix
+  s = s.replace(/^Bearer\s+/i, "");
+  // Remove any hidden whitespace/control chars (common when copied from logs)
+  s = s.replace(/\s+/g, "");
+  return s.length ? s : undefined;
+}
+
 // Get LLM config at RUNTIME (not build time) to pick up Vercel env vars
 function getLLMConfig() {
-  const provider = (process.env.LLM_PROVIDER || (process.env.MINIMAX_API_KEY ? "minimax" : "openai")).toLowerCase();
-  const model = process.env.LLM_MODEL ||
+  const explicitProvider = process.env.LLM_PROVIDER?.trim().toLowerCase();
+
+  const openaiKeyPresent = !!cleanApiKey(process.env.OPENAI_API_KEY);
+  const minimaxKeyPresent = !!cleanApiKey(process.env.MINIMAX_API_KEY);
+
+  const provider =
+    explicitProvider ||
+    // Prefer OpenAI when both keys exist (MiniMax auto-fallback surprised people in prod).
+    (openaiKeyPresent ? "openai" : (minimaxKeyPresent ? "minimax" : "openai"));
+
+  const model =
+    process.env.LLM_MODEL?.trim() ||
     (provider === "minimax"
-      ? (process.env.MINIMAX_MODEL || "MiniMax-M2.5")
-      : (process.env.OPENAI_MODEL || "gpt-5.1"));
+      ? process.env.MINIMAX_MODEL?.trim() || "MiniMax-M2.5"
+      : process.env.OPENAI_MODEL?.trim() || "gpt-5.1");
+
   return { provider, model };
 }
 
@@ -116,14 +158,24 @@ function getRuntimeClient(): OpenAI {
   const { provider } = getLLMConfig();
   // Recreate client if provider changed (e.g., after env update)
   if (!_runtimeClient || _cachedProvider !== provider) {
+    const openaiKey = cleanApiKey(process.env.OPENAI_API_KEY);
+    const minimaxKey = cleanApiKey(process.env.MINIMAX_API_KEY);
+
+    if (provider === "openai" && !openaiKey) {
+      console.warn("[LLM] provider=openai but OPENAI_API_KEY is missing/empty after sanitization");
+    }
+    if (provider === "minimax" && !minimaxKey) {
+      console.warn("[LLM] provider=minimax but MINIMAX_API_KEY is missing/empty after sanitization");
+    }
+
     _runtimeClient = new OpenAI(
       provider === "minimax"
         ? {
-            apiKey: process.env.MINIMAX_API_KEY,
-            baseURL: process.env.MINIMAX_BASE_URL || "https://api.minimax.io/v1",
+            apiKey: minimaxKey,
+            baseURL: process.env.MINIMAX_BASE_URL?.trim() || "https://api.minimax.io/v1",
           }
         : {
-            apiKey: process.env.OPENAI_API_KEY,
+            apiKey: openaiKey,
           }
     );
     _cachedProvider = provider;
@@ -217,6 +269,7 @@ function generateSystemPrompt(state: SessionState): string {
   CONVERSATIONAL STYLE:
   - After extracting all info, acknowledge what you understood (e.g., "Got it - 3 trees for removal in the backyard at 75201, with power lines nearby.")
   - Then ask ONLY for the remaining MISSING details (fields that are null in the Current Session State), ONE or TWO at a time.
+  - Keep "assistant_message" concise (prefer < 450 characters) and keep "next_questions" to at most 2 short questions.
   - CRITICAL STATE INTERPRETATION:
     * null = NOT ASKED YET (you should ask)
     * false = USER SAID "NO" (do NOT re-ask!)
@@ -424,11 +477,15 @@ export async function runChatTurn(state: SessionState, userMessage: string) {
 
   try {
     const systemPrompt = generateSystemPrompt(state);
-    console.log(`[LLM] Provider=${provider} model=${model} baseURL=${process.env.MINIMAX_BASE_URL || "default"} keypresent=${!!process.env.MINIMAX_API_KEY}`);
+    if (provider === "minimax") {
+      console.log(`[LLM] Provider=${provider} model=${model} baseURL=${process.env.MINIMAX_BASE_URL?.trim() || "https://api.minimax.io/v1"} keypresent=${!!cleanApiKey(process.env.MINIMAX_API_KEY)}`);
+    } else {
+      console.log(`[LLM] Provider=${provider} model=${model} keypresent=${!!cleanApiKey(process.env.OPENAI_API_KEY)}`);
+    }
     console.log(`[LLM] User message length: ${userMessage.length} chars`);
 
-    // FIX #3: Truncate message history to last 15 messages to reduce latency
-    const MAX_MESSAGES = 15;
+    // Truncate message history to reduce latency. (State is already provided in the system prompt.)
+    const MAX_MESSAGES = envInt("LLM_MAX_MESSAGES", 8);
     const truncatedMessages = state.messages.length > MAX_MESSAGES
       ? state.messages.slice(-MAX_MESSAGES)
       : state.messages;
@@ -437,16 +494,25 @@ export async function runChatTurn(state: SessionState, userMessage: string) {
 
     let completion;
     try {
-      completion = await client.chat.completions.create({
+      const maxTokens = envInt("LLM_MAX_COMPLETION_TOKENS", 650);
+      const temperature = envFloat("LLM_TEMPERATURE", 0.3);
+
+      const req: any = {
         model: model,
         messages: [
           { role: "system", content: systemPrompt },
-          ...truncatedMessages.map(m => ({ role: m.role as "user" | "assistant", content: m.content })),
+          ...truncatedMessages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
         ],
-        response_format: { type: "json_object" },
+        // OpenAI models support json_object; OpenAI-compat gateways may not.
+        ...(provider === "openai" ? { response_format: { type: "json_object" } } : {}),
+        // OpenAI uses max_completion_tokens (newer) while some gateways only honor max_tokens.
+        ...(provider === "openai" ? { max_completion_tokens: maxTokens } : { max_tokens: maxTokens }),
+        temperature,
+      };
 
-        max_completion_tokens: 1500, // More room for detailed responses
-      });
+      const llmStart = Date.now();
+      completion = await client.chat.completions.create(req);
+      console.log(`[LLM] Completed in ${Date.now() - llmStart}ms`);
     } catch (llmErr: any) {
       console.error("[LLM] Call failed:", llmErr?.message || llmErr);
       console.error("[LLM] Call failed details:", JSON.stringify(llmErr?.response?.data || llmErr));
@@ -689,8 +755,8 @@ export async function* streamChatTurn(
   const systemPrompt = generateSystemPrompt(state);
   console.log(`[Stream] Provider=${provider} model=${model}`);
 
-  // Truncate message history to last 15 messages
-  const MAX_MESSAGES = 15;
+  // Truncate message history to reduce latency. (State is already provided in the system prompt.)
+  const MAX_MESSAGES = envInt("LLM_MAX_MESSAGES", 8);
   const truncatedMessages = state.messages.length > MAX_MESSAGES
     ? state.messages.slice(-MAX_MESSAGES)
     : state.messages;
@@ -701,17 +767,65 @@ export async function* streamChatTurn(
   const extractor = new AssistantMessageExtractor();
 
   try {
-    // Use actual OpenAI streaming
-    const stream = await client.chat.completions.create({
+    const maxTokens = envInt("LLM_MAX_COMPLETION_TOKENS", 650);
+    const temperature = envFloat("LLM_TEMPERATURE", 0.3);
+
+    const streamingReq: any = {
       model: model,
       messages: [
         { role: "system", content: systemPrompt },
-        ...truncatedMessages.map(m => ({ role: m.role as "user" | "assistant", content: m.content })),
+        ...truncatedMessages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
       ],
-      response_format: { type: "json_object" },
-      max_completion_tokens: 1500,
+      ...(provider === "openai" ? { response_format: { type: "json_object" } } : {}),
+      ...(provider === "openai" ? { max_completion_tokens: maxTokens } : { max_tokens: maxTokens }),
+      temperature,
       stream: true,
-    });
+    };
+
+    let stream: any;
+    const llmStart = Date.now();
+    try {
+      stream = await client.chat.completions.create(streamingReq);
+    } catch (e) {
+      // Some OpenAI-compat providers don't implement streaming; fall back to non-streaming and
+      // yield a chunked assistant_message so the frontend still works.
+      console.warn("[Stream] Provider streaming failed; falling back to non-streaming:", (e as any)?.message || e);
+      const nonStreamingReq = { ...streamingReq, stream: false };
+      const completion = await client.chat.completions.create(nonStreamingReq);
+      console.log(`[LLM] (fallback) Completed in ${Date.now() - llmStart}ms`);
+      const rawContent = completion.choices[0]?.message?.content || "";
+      const cleanContent = stripCodeFence(rawContent);
+      const jsonPayload = extractParsableJSONObject(cleanContent) || cleanContent;
+      let parsed: z.infer<typeof LLMResponseSchema> | null = null;
+      try {
+        const tryParsed = LLMResponseSchema.safeParse(JSON.parse(jsonPayload));
+        if (tryParsed.success) parsed = tryParsed.data;
+      } catch {
+        parsed = null;
+      }
+
+      const finalAssistant = parsed?.assistant_message || "I'm having trouble responding right now. Please try again.";
+      // Yield in small bursts so the UI isn't stuck waiting for a single big chunk.
+      for (let i = 0; i < finalAssistant.length; i += 60) {
+        const part = finalAssistant.slice(i, i + 60);
+        assistantMessage += part;
+        yield part;
+      }
+
+      // Apply state updates if present
+      if (parsed?.updated_fields) {
+        const validation = validateLLMPatch(parsed.updated_fields, state.service_type || undefined);
+        if (validation.ok) applyValidatedPatch(state, validation.patch, parsed.updated_fields);
+        else applyManualExtraction(state, parsed.updated_fields);
+      }
+
+      // Ensure downstream logic runs (status, memory, etc.)
+      fullContent = rawContent;
+      memoryNote = parsed?.memory_note;
+      // Skip the rest of the streaming loop.
+      throw new Error("__STREAM_FALLBACK_DONE__");
+    }
+    console.log(`[LLM] (stream) Started in ${Date.now() - llmStart}ms`);
 
     // Stream chunks as they arrive, extracting assistant_message content
     for await (const chunk of stream) {
@@ -788,9 +902,13 @@ export async function* streamChatTurn(
     }
 
   } catch (err) {
+    if ((err as any)?.message === "__STREAM_FALLBACK_DONE__") {
+      // We already yielded the assistant message in fallback mode.
+    } else {
     console.error("[Stream] LLM Error:", err);
     assistantMessage = "I'm having trouble connecting right now. Please try again.";
     yield assistantMessage;
+    }
   }
 
   // Check readiness and update status
