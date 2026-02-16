@@ -48,7 +48,7 @@ async function sendEmail(to: string, subject: string, html: string, text: string
     console.log("--- Email Content ---");
     console.log(text);
     console.log("---------------------");
-    return true; // Return true so we don't break flow in dev
+    return false;
   }
 
   const transporter = nodemailer.createTransport({
@@ -82,11 +82,11 @@ async function sendSMS(to: string, body: string): Promise<boolean> {
   console.log(`[SMS] Sending to ${to}`);
 
   if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_PHONE_NUMBER) {
-    console.log("=== SMS (Mock - No Twilio Config) ===");
+    console.log("=== SMS skipped (No Twilio Config) ===");
     console.log("To:", to);
     console.log("Body:", body);
     console.log("=====================================");
-    return true; // Mock success for development
+    return false;
   }
 
   try {

@@ -156,6 +156,7 @@ Source: Website Quote Form
     `.trim();
     
     // Send email
+    let emailSent = false;
     if (GMAIL_USER && GMAIL_APP_PASSWORD) {
       const transporter = nodemailer.createTransport({
         service: "gmail",
@@ -183,6 +184,7 @@ Source: Website Quote Form
         attachments,
       });
       
+      emailSent = true;
       console.log(`[Quote] Email sent to ${OWNER_EMAIL} with ${savedPhotos.length} photos`);
     } else {
       console.log("[Quote] Email skipped (no Gmail config)");
@@ -196,6 +198,7 @@ Source: Website Quote Form
       {
         success: true,
         message: "Quote request received",
+        emailSent,
       },
       { headers: CORS_HEADERS }
     );
