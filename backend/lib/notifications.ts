@@ -7,7 +7,13 @@ import { formatPhone } from "./utils";
 // ----------------------
 // CONFIG
 // ----------------------
-const OWNER_EMAIL = process.env.OWNER_EMAIL || "shipithon@gmail.com";
+function cleanEnv(name: string): string {
+  const raw = process.env[name];
+  if (!raw) return "";
+  return raw.replace(/\s+#.*$/, "").trim();
+}
+
+const OWNER_EMAIL = cleanEnv("OWNER_EMAIL") || cleanEnv("GMAIL_USER") || "shipithon@gmail.com";
 const OWNER_PHONE = process.env.OWNER_PHONE || "";
 const APP_URL = process.env.APP_URL || "http://localhost:3001";
 
@@ -17,8 +23,8 @@ const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
 const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER;
 
 // Gmail config
-const GMAIL_USER = process.env.GMAIL_USER;
-const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
+const GMAIL_USER = cleanEnv("GMAIL_USER");
+const GMAIL_APP_PASSWORD = cleanEnv("GMAIL_APP_PASSWORD").replace(/\s+/g, "");
 
 // ----------------------
 // SERVICE LABELS

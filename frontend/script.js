@@ -25,6 +25,18 @@ function setChatBusy(busy) {
   if (sendBtnEl) sendBtnEl.disabled = busy;
 }
 
+function focusChatInput() {
+  if (!chatInput || chatInput.disabled) return;
+  if (chatInputArea?.classList.contains("hidden")) return;
+  requestAnimationFrame(() => {
+    chatInput.focus({ preventScroll: true });
+    const len = chatInput.value.length;
+    if (typeof chatInput.setSelectionRange === "function") {
+      chatInput.setSelectionRange(len, len);
+    }
+  });
+}
+
 // ----------------------
 // RENDERING
 // ----------------------
@@ -100,7 +112,7 @@ function openChat() {
 
   setTimeout(() => {
     heroResponse.classList.add("visible");
-    chatInput?.focus();
+    focusChatInput();
   }, 300);
 }
 
@@ -200,16 +212,19 @@ async function handleSubmit(userText) {
           }
 
           setChatBusy(false);
+          focusChatInput();
         },
         onError: (err) => {
           console.error("Stream error:", err);
           bubble.innerHTML = "Sorry - something went wrong. Please try again.";
           setChatBusy(false);
+          focusChatInput();
         },
       });
     } catch (err) {
       console.error("Chat error:", err);
       setChatBusy(false);
+      focusChatInput();
     }
   } else {
     // Non-streaming approach
@@ -236,11 +251,13 @@ async function handleSubmit(userText) {
         setTimeout(() => transitionToPhotos(), 300);
       }
       setChatBusy(false);
+      focusChatInput();
     } catch (err) {
       hideTyping();
       renderMessage("assistant", "Sorry - something went wrong. Please try again.");
       console.error("Chat error:", err);
       setChatBusy(false);
+      focusChatInput();
     }
   }
 }
