@@ -68,6 +68,8 @@ ZAPIER_EVENTS_API_KEY=change-me      # required in x-zapier-events-key for /api/
 
 # Business Config
 OWNER_EMAIL=
+# Optional: multiple recipients (comma/semicolon separated)
+# OWNER_EMAILS=owner1@example.com,owner2@example.com
 OWNER_PHONE=
 CALENDLY_LINK=
 APP_URL=https://bigdtrees.com

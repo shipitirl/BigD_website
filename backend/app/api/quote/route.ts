@@ -12,7 +12,20 @@ function cleanEnv(name: string): string {
   return raw.replace(/\s+#.*$/, "").trim();
 }
 
-const OWNER_EMAIL = cleanEnv("OWNER_EMAIL") || "shipithon@gmail.com";
+function parseEmailList(raw: string): string[] {
+  return raw
+    .split(/[;,]/)
+    .map((v) => v.trim())
+    .filter(Boolean);
+}
+
+const OWNER_EMAIL_RECIPIENTS = (() => {
+  const list = parseEmailList(cleanEnv("OWNER_EMAILS"));
+  if (list.length > 0) return list;
+  const single = parseEmailList(cleanEnv("OWNER_EMAIL"));
+  if (single.length > 0) return single;
+  return ["shipithon@gmail.com"];
+})();
 const GMAIL_USER = cleanEnv("GMAIL_USER");
 const GMAIL_APP_PASSWORD = cleanEnv("GMAIL_APP_PASSWORD").replace(/\s+/g, "");
 const RESEND_API_KEY = cleanEnv("RESEND_API_KEY");
@@ -39,7 +52,7 @@ const CORS_HEADERS = {
 type EmailAttachment = { filename: string; path: string; contentType?: string; contentBase64?: string };
 
 async function sendQuoteEmail(
-  to: string,
+  to: string[],
   subject: string,
   text: string,
   html: string,
@@ -57,7 +70,7 @@ async function sendQuoteEmail(
           },
           body: JSON.stringify({
             from: RESEND_FROM,
-            to: [to],
+            to,
             subject,
             text,
             html,
@@ -257,7 +270,7 @@ Source: Website Quote Form
     
     // Send email
     const emailSent = await sendQuoteEmail(
-      OWNER_EMAIL,
+      OWNER_EMAIL_RECIPIENTS,
       subject,
       textContent,
       htmlContent,
@@ -276,7 +289,7 @@ Source: Website Quote Form
       );
     }
 
-    console.log(`[Quote] Email sent to ${OWNER_EMAIL} with ${savedPhotos.length} photos`);
+    console.log(`[Quote] Email sent to ${OWNER_EMAIL_RECIPIENTS.join(", ")} with ${savedPhotos.length} photos`);
     
     // Log the submission
     console.log(`[Quote] New request from ${name} (${phone}) - ${serviceLabel}`);

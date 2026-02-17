@@ -13,7 +13,22 @@ function cleanEnv(name: string): string {
   return raw.replace(/\s+#.*$/, "").trim();
 }
 
-const OWNER_EMAIL = cleanEnv("OWNER_EMAIL") || cleanEnv("GMAIL_USER") || "shipithon@gmail.com";
+function parseEmailList(raw: string): string[] {
+  return raw
+    .split(/[;,]/)
+    .map((v) => v.trim())
+    .filter(Boolean);
+}
+
+const OWNER_EMAIL_RECIPIENTS = (() => {
+  const list = parseEmailList(cleanEnv("OWNER_EMAILS"));
+  if (list.length > 0) return list;
+  const single = parseEmailList(cleanEnv("OWNER_EMAIL"));
+  if (single.length > 0) return single;
+  const fallback = parseEmailList(cleanEnv("GMAIL_USER"));
+  if (fallback.length > 0) return fallback;
+  return ["shipithon@gmail.com"];
+})();
 const OWNER_PHONE = process.env.OWNER_PHONE || "";
 const APP_URL = process.env.APP_URL || "http://localhost:3001";
 
@@ -83,7 +98,7 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): 
 }
 
 async function sendViaResend(
-  to: string,
+  to: string[],
   subject: string,
   html: string,
   text: string,
@@ -101,7 +116,7 @@ async function sendViaResend(
         },
         body: JSON.stringify({
           from: RESEND_FROM,
-          to: [to],
+          to,
           subject,
           html,
           text,
@@ -131,13 +146,13 @@ async function sendViaResend(
 }
 
 async function sendEmail(
-  to: string,
+  to: string[],
   subject: string,
   html: string,
   text: string,
   attachments: EmailAttachment[] = []
 ): Promise<boolean> {
-  console.log(`[Email] Sending to ${to}: ${subject} (timeout=${EMAIL_TIMEOUT_MS}ms)`);
+  console.log(`[Email] Sending to ${to.join(", ")}: ${subject} (timeout=${EMAIL_TIMEOUT_MS}ms)`);
 
   // First choice in production: Resend API (HTTPS, usually reliable on Railway)
   if (RESEND_API_KEY) {
@@ -431,7 +446,7 @@ export async function notifyOwnerEmail(
   const subject = `🌳 New Estimate: ${serviceType} — ${session.zip || "ZIP?"} — ${estimateRange}`;
 
   return sendEmail(
-    OWNER_EMAIL,
+    OWNER_EMAIL_RECIPIENTS,
     subject,
     buildOwnerEmailHtml(session, attachments.length),
     buildOwnerEmailText(session, attachments.length),
