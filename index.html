@@ -341,7 +341,10 @@
           try {
             const API_BASE = (window.ENV && (window.ENV.BACKEND_URL || window.ENV.API_BASE)) || 'https://bigd-backend.vercel.app';
             const res = await fetch(`${API_BASE}/api/quote`, { method:'POST', body: fd });
-            if(!res.ok) throw new Error('Request failed');
+            const data = await res.json().catch(() => ({}));
+            if(!res.ok || data.emailSent === false) {
+              throw new Error(data?.error || 'Request failed');
+            }
             form.reset();
             msg.textContent = '✅ Request sent. We will reach out shortly.';
           } catch (err) {

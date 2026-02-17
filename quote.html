@@ -449,12 +449,13 @@
                     method: 'POST',
                     body: formData
                 });
-                
-                if (response.ok) {
+                const data = await response.json().catch(() => ({}));
+
+                if (response.ok && data.emailSent !== false) {
                     quoteForm.style.display = 'none';
                     successMessage.classList.add('show');
                 } else {
-                    throw new Error('Failed to submit');
+                    throw new Error(data?.error || 'Failed to submit');
                 }
             } catch (err) {
                 console.error('Submit error:', err);

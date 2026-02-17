@@ -6,10 +6,19 @@ import nodemailer from "nodemailer";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 
-const OWNER_EMAIL = process.env.OWNER_EMAIL || "shipithon@gmail.com";
-const GMAIL_USER = process.env.GMAIL_USER;
-const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
+function cleanEnv(name: string): string {
+  const raw = process.env[name];
+  if (!raw) return "";
+  return raw.replace(/\s+#.*$/, "").trim();
+}
+
+const OWNER_EMAIL = cleanEnv("OWNER_EMAIL") || "shipithon@gmail.com";
+const GMAIL_USER = cleanEnv("GMAIL_USER");
+const GMAIL_APP_PASSWORD = cleanEnv("GMAIL_APP_PASSWORD").replace(/\s+/g, "");
+const RESEND_API_KEY = cleanEnv("RESEND_API_KEY");
+const RESEND_FROM = cleanEnv("RESEND_FROM") || "onboarding@resend.dev";
 const UPLOAD_DIR = process.env.UPLOAD_DIR || "./uploads";
+const EMAIL_TIMEOUT_MS = Number(process.env.EMAIL_TIMEOUT_MS || 60000);
 
 const serviceLabels: Record<string, string> = {
   tree_removal: "Tree Removal",
@@ -26,6 +35,90 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
 };
+
+type EmailAttachment = { filename: string; path: string; contentType?: string; contentBase64?: string };
+
+async function sendQuoteEmail(
+  to: string,
+  subject: string,
+  text: string,
+  html: string,
+  attachments: EmailAttachment[]
+): Promise<boolean> {
+  // Prefer Resend on cloud deployments
+  if (RESEND_API_KEY) {
+    try {
+      const res = await Promise.race([
+        fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${RESEND_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            from: RESEND_FROM,
+            to: [to],
+            subject,
+            text,
+            html,
+            attachments: attachments
+              .filter((a) => a.contentBase64)
+              .map((a) => ({
+                filename: a.filename,
+                content: a.contentBase64,
+                ...(a.contentType ? { type: a.contentType } : {}),
+              })),
+          }),
+        }),
+        new Promise<Response>((_, reject) =>
+          setTimeout(() => reject(new Error(`Resend timeout after ${EMAIL_TIMEOUT_MS}ms`)), EMAIL_TIMEOUT_MS)
+        ),
+      ]);
+
+      if ((res as Response).ok) {
+        console.log("[Quote] Email sent via Resend");
+        return true;
+      }
+      const body = await (res as Response).text();
+      console.error(`[Quote] Resend failed: ${(res as Response).status} ${body}`);
+    } catch (err) {
+      console.error("[Quote] Resend request error:", err);
+    }
+  }
+
+  // Gmail SMTP fallback
+  if (!GMAIL_USER || !GMAIL_APP_PASSWORD) {
+    console.warn("[Quote] Email skipped: no working provider config");
+    return false;
+  }
+
+  try {
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: GMAIL_USER,
+        pass: GMAIL_APP_PASSWORD,
+      },
+      connectionTimeout: EMAIL_TIMEOUT_MS,
+      greetingTimeout: EMAIL_TIMEOUT_MS,
+      socketTimeout: EMAIL_TIMEOUT_MS,
+    });
+
+    await transporter.sendMail({
+      from: `"Big D's Tree Service" <${GMAIL_USER}>`,
+      to,
+      subject,
+      text,
+      html,
+      attachments: attachments.map((a) => ({ filename: a.filename, path: a.path })),
+    });
+    console.log("[Quote] Email sent via Gmail fallback");
+    return true;
+  } catch (err) {
+    console.error("[Quote] Gmail fallback failed:", err);
+    return false;
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -50,6 +143,7 @@ export async function POST(request: NextRequest) {
     // Handle photo uploads
     const photos = formData.getAll("photos") as File[];
     const savedPhotos: string[] = [];
+    const emailAttachments: EmailAttachment[] = [];
     
     if (photos.length > 0) {
       // Create upload directory
@@ -64,6 +158,12 @@ export async function POST(request: NextRequest) {
           const filepath = path.join(uploadPath, filename);
           await writeFile(filepath, buffer);
           savedPhotos.push(filepath);
+          emailAttachments.push({
+            filename,
+            path: filepath,
+            contentType: photo.type || "application/octet-stream",
+            contentBase64: buffer.toString("base64"),
+          });
         }
       }
     }
@@ -156,40 +256,27 @@ Source: Website Quote Form
     `.trim();
     
     // Send email
-    let emailSent = false;
-    if (GMAIL_USER && GMAIL_APP_PASSWORD) {
-      const transporter = nodemailer.createTransport({
-        service: "gmail",
-        auth: {
-          user: GMAIL_USER,
-          pass: GMAIL_APP_PASSWORD,
+    const emailSent = await sendQuoteEmail(
+      OWNER_EMAIL,
+      subject,
+      textContent,
+      htmlContent,
+      emailAttachments
+    );
+
+    if (!emailSent) {
+      console.error("[Quote] Email delivery failed for quote submission");
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Email delivery failed",
+          emailSent: false,
         },
-      });
-      
-      // Prepare attachments
-      const attachments = [];
-      for (const photoPath of savedPhotos) {
-        attachments.push({
-          filename: path.basename(photoPath),
-          path: photoPath,
-        });
-      }
-      
-      await transporter.sendMail({
-        from: `"Big D's Tree Service" <${GMAIL_USER}>`,
-        to: OWNER_EMAIL,
-        subject,
-        text: textContent,
-        html: htmlContent,
-        attachments,
-      });
-      
-      emailSent = true;
-      console.log(`[Quote] Email sent to ${OWNER_EMAIL} with ${savedPhotos.length} photos`);
-    } else {
-      console.log("[Quote] Email skipped (no Gmail config)");
-      console.log(textContent);
+        { status: 502, headers: CORS_HEADERS }
+      );
     }
+
+    console.log(`[Quote] Email sent to ${OWNER_EMAIL} with ${savedPhotos.length} photos`);
     
     // Log the submission
     console.log(`[Quote] New request from ${name} (${phone}) - ${serviceLabel}`);
