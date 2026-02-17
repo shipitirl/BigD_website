@@ -26,6 +26,10 @@ const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER;
 const GMAIL_USER = cleanEnv("GMAIL_USER");
 const GMAIL_APP_PASSWORD = cleanEnv("GMAIL_APP_PASSWORD").replace(/\s+/g, "");
 
+// Resend config (preferred in cloud environments)
+const RESEND_API_KEY = cleanEnv("RESEND_API_KEY");
+const RESEND_FROM = cleanEnv("RESEND_FROM") || "onboarding@resend.dev";
+
 // ----------------------
 // SERVICE LABELS
 // ----------------------
@@ -78,6 +82,54 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): 
   });
 }
 
+async function sendViaResend(
+  to: string,
+  subject: string,
+  html: string,
+  text: string,
+  attachments: EmailAttachment[] = []
+): Promise<boolean> {
+  if (!RESEND_API_KEY) return false;
+
+  try {
+    const response = await withTimeout(
+      fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${RESEND_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: RESEND_FROM,
+          to: [to],
+          subject,
+          html,
+          text,
+          attachments: attachments.map((a) => ({
+            filename: a.filename,
+            content: a.content.toString("base64"),
+            ...(a.contentType ? { type: a.contentType } : {}),
+          })),
+        }),
+      }),
+      EMAIL_TIMEOUT_MS,
+      "resend api"
+    );
+
+    if (!response.ok) {
+      const body = await response.text();
+      console.error(`[Email] Resend failed (${response.status}): ${body}`);
+      return false;
+    }
+
+    console.log("[Email] Sent successfully via Resend API");
+    return true;
+  } catch (err) {
+    console.error("[Email] Resend request failed:", err);
+    return false;
+  }
+}
+
 async function sendEmail(
   to: string,
   subject: string,
@@ -87,8 +139,15 @@ async function sendEmail(
 ): Promise<boolean> {
   console.log(`[Email] Sending to ${to}: ${subject} (timeout=${EMAIL_TIMEOUT_MS}ms)`);
 
+  // First choice in production: Resend API (HTTPS, usually reliable on Railway)
+  if (RESEND_API_KEY) {
+    const resendSent = await sendViaResend(to, subject, html, text, attachments);
+    if (resendSent) return true;
+    console.warn("[Email] Falling back to Gmail SMTP after Resend failure");
+  }
+
   if (!GMAIL_USER || !GMAIL_APP_PASSWORD) {
-    console.warn("[Email] Skipped: GMAIL_USER or GMAIL_APP_PASSWORD not set");
+    console.warn("[Email] Skipped: no working provider config (RESEND_API_KEY or Gmail creds)");
     console.log("--- Email Content ---");
     console.log(text);
     console.log("---------------------");
