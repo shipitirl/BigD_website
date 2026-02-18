@@ -156,7 +156,7 @@ function transitionToResult(result) {
       <p class="result-subtext">${result.subtext}</p>
       <div class="result-contact">
         <p><a href="tel:2622150497" class="contact-link phone">📞 (262) 215-0497</a></p>
-        <p><a href="mailto:shipithon@gmail.com" class="contact-link email">✉️ shipithon@gmail.com</a></p>
+        <p><a href="mailto:bigdstrees33@gmail.com" class="contact-link email">✉️ bigdstrees33@gmail.com</a></p>
       </div>
     `;
   }
