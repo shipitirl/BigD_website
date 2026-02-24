@@ -2,3 +2,8 @@ User-agent: *
 Allow: /
 
 Sitemap: https://bigdstreeservice.com/sitemap.xml
+
+# AI crawl hint files
+# (non-standard but increasingly used by tooling)
+Allow: /llms.txt
+Allow: /llms-full.txt

@@ -1,0 +1,37 @@
+# Big D's Tree Service
+
+> Local tree service in Janesville, Wisconsin focused on safe tree removal, pruning, stump grinding, and emergency storm cleanup.
+
+## Business Snapshot
+- Name: Big D's Tree Service
+- Service Area: Janesville + Rock, Walworth, Jefferson, Dane, Racine Counties (WI)
+- Phone: (262) 215-0497
+- Email: bigdstrees33@gmail.com
+- Website: https://bigdstreeservice.com/
+- Facebook: https://www.facebook.com/BigDsTreeService
+
+## Primary Services
+- Tree Removal
+- Tree Pruning / Trimming
+- Stump Grinding
+- Emergency Storm Cleanup
+- Land Clearing / Forestry Mulching
+- Tree Planting
+
+## Audience
+- Homeowners
+- Rental property owners
+- Small commercial property managers
+
+## Canonical Pages
+- Home: https://bigdstreeservice.com/
+- Services: https://bigdstreeservice.com/services.html
+- Quote: https://bigdstreeservice.com/quote.html
+- Emergency Service: https://bigdstreeservice.com/emergency-tree-service-janesville-wi.html
+- Tree Removal: https://bigdstreeservice.com/tree-removal-janesville-wi.html
+- Pruning/Trimming: https://bigdstreeservice.com/tree-pruning-trimming-janesville-wi.html
+- Stump Grinding: https://bigdstreeservice.com/stump-grinding-janesville-wi.html
+- Land Clearing: https://bigdstreeservice.com/land-clearing-janesville-wi.html
+
+## Contact Preference
+Call or text first for urgent tree hazards, then submit photos through quote form when possible.
