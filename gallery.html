@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gallery - Big D's Tree Service Janesville WI</title>
+    <meta name="description" content="See our work! Big D's Tree Service gallery of tree removal, stump grinding, and tree care projects in Janesville, WI and surrounding areas.">
+    <link rel="canonical" href="https://bigdstreeservice.com/gallery.html">
+    <meta property="og:title" content="Gallery - Big D's Tree Service">
+    <meta property="og:description" content="See our work! Tree removal, stump grinding, and tree care projects.">
+    <meta property="og:type" content="website">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: #f8f9fa; color: #333; line-height: 1.6; }
+        
+        /* Header */
+        .site-header { background: linear-gradient(135deg, #0b2a4d 0%, #1e3a5f 50%, #c53030 150%); padding: 1rem 0; position: sticky; top: 0; z-index: 100; }
+        .header-content { max-width: 1100px; margin: 0 auto; padding: 0 1rem; display: flex; justify-content: space-between; align-items: center; }
+        .logo { font-family: 'Outfit', sans-serif; font-size: 1.5rem; font-weight: 700; color: #fff; text-decoration: none; }
+        .logo span { color: #ff6b6b; }
+        .nav { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+        .nav a { color: rgba(255,255,255,0.9); text-decoration: none; font-weight: 600; transition: color 0.2s; }
+        .nav a:hover { color: #fff; }
+        
+        /* Hero */
+        .hero { background: linear-gradient(135deg, #0b2a4d 0%, #1e3a5f 60%, #c53030 130%); color: #fff; padding: 3rem 1rem; text-align: center; }
+        .hero h1 { font-family: 'Outfit', sans-serif; font-size: 2.5rem; margin-bottom: 0.5rem; }
+        .hero p { font-size: 1.1rem; opacity: 0.9; }
+        
+        /* Gallery */
+        .gallery-container { max-width: 1200px; margin: 2rem auto; padding: 0 1rem; }
+        .gallery-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); 
+            gap: 1rem; 
+        }
+        .gallery-item { 
+            position: relative; 
+            overflow: hidden; 
+            border-radius: 12px; 
+            aspect-ratio: 4/3;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .gallery-item:hover { 
+            transform: translateY(-4px); 
+            box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+        }
+        .gallery-item img { 
+            width: 100%; 
+            height: 100%; 
+            object-fit: cover; 
+            transition: transform 0.3s ease;
+        }
+        .gallery-item:hover img { transform: scale(1.05); }
+        
+        /* Lightbox */
+        .lightbox { 
+            display: none; 
+            position: fixed; 
+            top: 0; left: 0; right: 0; bottom: 0; 
+            background: rgba(0,0,0,0.95); 
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+        .lightbox.active { display: flex; }
+        .lightbox img { 
+            max-width: 90%; 
+            max-height: 80vh; 
+            border-radius: 8px;
+            box-shadow: 0 0 40px rgba(0,0,0,0.5);
+        }
+        .lightbox-close {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            font-size: 2rem;
+            color: #fff;
+            cursor: pointer;
+            background: none;
+            border: none;
+        }
+        .lightbox-nav {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255,255,255,0.2);
+            color: #fff;
+            border: none;
+            font-size: 2rem;
+            padding: 1rem;
+            cursor: pointer;
+            border-radius: 50%;
+            transition: background 0.2s;
+        }
+        .lightbox-nav:hover { background: rgba(255,255,255,0.4); }
+        .lightbox-prev { left: 20px; }
+        .lightbox-next { right: 20px; }
+        
+        /* CTA */
+        .cta { background: linear-gradient(135deg, #2d5016 0%, #4a7c23 100%); color: #fff; padding: 3rem 1rem; text-align: center; margin-top: 3rem; }
+        .cta h2 { font-family: 'Outfit', sans-serif; font-size: 2rem; margin-bottom: 1rem; }
+        .cta-btn { 
+            display: inline-block; 
+            background: #fff; 
+            color: #2d5016; 
+            padding: 1rem 2rem; 
+            border-radius: 8px; 
+            text-decoration: none; 
+            font-weight: 700;
+            margin-top: 1rem;
+            transition: transform 0.2s;
+        }
+        .cta-btn:hover { transform: scale(1.05); }
+        
+        /* Footer */
+        .footer { background: #1a1a1a; color: #888; padding: 2rem 1rem; text-align: center; }
+        .footer a { color: #4a7c23; }
+        
+        @media (max-width: 768px) {
+            .nav { display: none; }
+            .hero h1 { font-size: 1.8rem; }
+            .gallery-grid { grid-template-columns: repeat(2, 1fr); gap: 0.5rem; }
+        }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <div class="header-content">
+            <a href="/" class="logo">Big D's <span>Tree Service</span></a>
+            <nav class="nav">
+                <a href="/">Home</a>
+                <a href="services.html">Services</a>
+                <a href="quote.html">Get Quote</a>
+                <a href="gallery.html">Gallery</a>
+            </nav>
+        </div>
+    </header>
+
+    <section class="hero">
+        <h1>Our Work Gallery</h1>
+        <p>See the quality of our tree service projects in Janesville & surrounding areas</p>
+    </section>
+
+    <div class="gallery-container">
+        <div class="gallery-grid">
+            <div class="gallery-item" onclick="openLightbox(0)">
+                <img src="assets/images/gallery/gallery-1.png" alt="Tree removal project 1" loading="lazy">
+            </div>
+            <div class="gallery-item" onclick="openLightbox(1)">
+                <img src="assets/images/gallery/gallery-2.png" alt="Tree removal project 2" loading="lazy">
+            </div>
+            <div class="gallery-item" onclick="openLightbox(2)">
+                <img src="assets/images/gallery/gallery-3.png" alt="Stump grinding project" loading="lazy">
+            </div>
+            <div class="gallery-item" onclick="openLightbox(3)">
+                <img src="assets/images/gallery/gallery-4.png" alt="Tree care project" loading="lazy">
+            </div>
+            <div class="gallery-item" onclick="openLightbox(4)">
+                <img src="assets/images/gallery/gallery-5.png" alt="Land clearing project" loading="lazy">
+            </div>
+            <div class="gallery-item" onclick="openLightbox(5)">
+                <img src="assets/images/gallery/gallery-6.png" alt="Emergency tree service" loading="lazy">
+            </div>
+            <div class="gallery-item" onclick="openLightbox(6)">
+                <img src="assets/images/gallery/gallery-7.png" alt="Tree trimming project" loading="lazy">
+            </div>
+            <div class="gallery-item" onclick="openLightbox(7)">
+                <img src="assets/images/gallery/gallery-8.png" alt="Storm cleanup project" loading="lazy">
+            </div>
+            <div class="gallery-item" onclick="openLightbox(8)">
+                <img src="assets/images/gallery/gallery-9.png" alt="Tree removal before/after" loading="lazy">
+            </div>
+            <div class="gallery-item" onclick="openLightbox(9)">
+                <img src="assets/images/gallery/gallery-10.png" alt="Residential tree service" loading="lazy">
+            </div>
+            <div class="gallery-item" onclick="openLightbox(10)">
+                <img src="assets/images/gallery/gallery-11.png" alt="Commercial tree work" loading="lazy">
+            </div>
+            <div class="gallery-item" onclick="openLightbox(11)">
+                <img src="assets/images/gallery/gallery-12.png" alt="Tree planting project" loading="lazy">
+            </div>
+        </div>
+    </div>
+
+    <!-- Lightbox -->
+    <div class="lightbox" id="lightbox">
+        <button class="lightbox-close" onclick="closeLightbox()">&times;</button>
+        <button class="lightbox-nav lightbox-prev" onclick="prevImage()">&#10094;</button>
+        <img id="lightbox-img" src="" alt="Gallery image">
+        <button class="lightbox-nav lightbox-next" onclick="nextImage()">&#10095;</button>
+    </div>
+
+    <section class="cta">
+        <h2>Need Tree Service?</h2>
+        <p>Get a free estimate for your tree care needs</p>
+        <a href="quote.html" class="cta-btn">Get Free Quote</a>
+    </section>
+
+    <footer class="footer">
+        <p>&copy; 2024 Big D's Tree Service LLC | <a href="tel:2622150497">(262) 215-0497</a></p>
+        <p>Serving Janesville, Whitewater, Rock, Walworth, Jefferson, Dane & Racine Counties</p>
+    </footer>
+
+    <script>
+        const images = document.querySelectorAll('.gallery-item img');
+        const lightbox = document.getElementById('lightbox');
+        const lightboxImg = document.getElementById('lightbox-img');
+        let currentIndex = 0;
+
+        function openLightbox(index) {
+            currentIndex = index;
+            lightboxImg.src = images[index].src;
+            lightbox.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeLightbox() {
+            lightbox.classList.remove('active');
+            document.body.style.overflow = 'auto';
+        }
+
+        function prevImage() {
+            currentIndex = (currentIndex - 1 + images.length) % images.length;
+            lightboxImg.src = images[currentIndex].src;
+        }
+
+        function nextImage() {
+            currentIndex = (currentIndex + 1) % images.length;
+            lightboxImg.src = images[currentIndex].src;
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (!lightbox.classList.contains('active')) return;
+            if (e.key === 'Escape') closeLightbox();
+            if (e.key === 'ArrowLeft') prevImage();
+            if (e.key === 'ArrowRight') nextImage();
+        });
+
+        // Click outside to close
+        lightbox.addEventListener('click', (e) => {
+            if (e.target === lightbox) closeLightbox();
+        });
+    </script>
+</body>
+</html>
