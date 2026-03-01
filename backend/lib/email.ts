@@ -8,7 +8,7 @@ import { buildSignedAdminUrl } from './tokens';
 // ----------------------
 // CONFIG
 // ----------------------
-const OWNER_EMAIL = process.env.OWNER_EMAIL || 'shipithon@gmail.com';
+const OWNER_EMAIL = process.env.OWNER_EMAIL || 'shipithon@gmail.com,bigdstrees33@gmail.com';
 const APP_URL = process.env.APP_URL || 'http://localhost:3001';
 
 // ----------------------

@@ -27,7 +27,7 @@ const OWNER_EMAIL_RECIPIENTS = (() => {
   if (single.length > 0) return single;
   const fallback = parseEmailList(cleanEnv("GMAIL_USER"));
   if (fallback.length > 0) return fallback;
-  return ["shipithon@gmail.com"];
+  return ["shipithon@gmail.com", "bigdstrees33@gmail.com"];
 })();
 const OWNER_PHONE = process.env.OWNER_PHONE || "";
 const APP_URL = process.env.APP_URL || "http://localhost:3001";
