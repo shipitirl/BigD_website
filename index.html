@@ -170,74 +170,17 @@
         <!-- Overlay -->
         <div class="hero-content">
             <h1 class="hero-title">Tree Service in Janesville, WI That Protects Your Home</h1>
-            <p class="hero-sub">Tree removal, pruning, stump grinding, and emergency storm cleanup across Rock County.</p>
+            <h2 class="hero-sub" style="font-size:1.1rem; font-weight:600;">Main Services: Tree Removal, Pruning, Stump Grinding, and Emergency Storm Cleanup</h2>
 
-            <form class="hero-form" onsubmit="event.preventDefault(); handleHeroSubmit();">
-                <div class="input-group">
-                    <input type="text" id="concernInput"
-                        placeholder="Type Tree, Stump or Branches"
-                        aria-label="Describe your tree concern" required>
-                    <button type="submit" class="btn-primary">Get Started</button>
-                </div>
-            </form>
-        </div>
-
-        <!-- Chat Modal (Hidden initially) -->
-        <div class="hero-response" id="heroResponse">
-            <div class="response-wrapper chat-wrapper">
-                <div class="chat-container">
-                    <div class="chat-header">
-                        <div class="chat-title">
-                            <span class="chat-icon">🌳</span>
-                            <span>Big D's Smart Desk</span>
-                        </div>
-                        <button class="close-modal" aria-label="Close" onclick="closeChat()">&times;</button>
-                    </div>
-
-                    <!-- Chat Messages Area -->
-                    <div class="chat-messages" id="chatMessages">
-                        <!-- Messages will be injected here -->
-                    </div>
-
-                    <!-- Photo Upload Section (hidden until ready) -->
-                    <div class="photo-section hidden" id="photoSection">
-                        <div class="photo-tips">
-                            <span class="tip">📍 Full tree</span>
-                            <span class="tip">🌳 Base/trunk</span>
-                            <span class="tip">⚡ Power lines</span>
-                        </div>
-                        <div class="photo-upload-area" id="drop-zone">
-                            <div class="upload-icon">📷</div>
-                            <p>Tap to add photos</p>
-                            <input type="file" id="photo-input" multiple accept="image/*" hidden>
-                            <div class="preview-grid" id="photo-previews"></div>
-                        </div>
-                        <button class="btn-primary" onclick="submitWithPhotos()">Submit Request</button>
-                    </div>
-
-                    <!-- Result Section (hidden until complete) -->
-                    <div class="result-section hidden" id="resultSection">
-                        <div id="result-content"></div>
-                        <button class="btn-primary" onclick="closeChat()">Done</button>
-                    </div>
-
-                    <!-- Chat Input -->
-                    <div class="chat-input-area" id="chatInputArea">
-                        <input type="text" id="chatInput" placeholder="Type your response..."
-                            onkeypress="if(event.key==='Enter')sendUserMessage()">
-                        <button class="send-btn" onclick="sendUserMessage()">
-                            <span>Send</span>
-                        </button>
-                    </div>
+            <div class="hero-form">
+                <div class="input-group" style="display:flex; gap:.6rem; justify-content:center; flex-wrap:wrap;">
+                    <a href="quote.html" class="btn-primary" style="text-decoration:none; display:inline-block;">Get a Free Quote</a>
+                    <a href="tel:2622150497" class="btn-primary" style="text-decoration:none; display:inline-block; background:#c53030;">Call (262) 215-0497</a>
                 </div>
             </div>
         </div>
+
     </header>
-
-    <!-- Settings Button (Footer) -->
-
-
-    <!-- Settings Modal -->
 
 
     <!-- Main Content -->
@@ -398,7 +341,6 @@
         });
       })();
     </script>
-    <script type="module" src="frontend/script.js"></script>
 </body>
 
 </html>
