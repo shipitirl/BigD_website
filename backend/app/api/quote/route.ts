@@ -19,13 +19,26 @@ function parseEmailList(raw: string): string[] {
     .filter(Boolean);
 }
 
-const OWNER_EMAIL_RECIPIENTS = (() => {
-  const list = parseEmailList(cleanEnv("OWNER_EMAILS"));
-  if (list.length > 0) return list;
-  const single = parseEmailList(cleanEnv("OWNER_EMAIL"));
-  if (single.length > 0) return single;
-  return ["shipithon@gmail.com"];
-})();
+const DEFAULT_OWNER_EMAIL_RECIPIENTS = ["shipithon@gmail.com", "bigdstrees33@gmail.com"];
+
+function buildOwnerEmailRecipients(): string[] {
+  const configured = [
+    ...parseEmailList(cleanEnv("OWNER_EMAILS")),
+    ...parseEmailList(cleanEnv("OWNER_EMAIL")),
+  ];
+  const deduped = [...new Set(configured)];
+
+  if (deduped.length === 0) return DEFAULT_OWNER_EMAIL_RECIPIENTS;
+
+  // Keep both owner inboxes on quote notifications when production only has one of the known owner addresses configured.
+  if (deduped.length === 1 && DEFAULT_OWNER_EMAIL_RECIPIENTS.includes(deduped[0])) {
+    return DEFAULT_OWNER_EMAIL_RECIPIENTS;
+  }
+
+  return deduped;
+}
+
+const OWNER_EMAIL_RECIPIENTS = buildOwnerEmailRecipients();
 const GMAIL_USER = cleanEnv("GMAIL_USER");
 const GMAIL_APP_PASSWORD = cleanEnv("GMAIL_APP_PASSWORD").replace(/\s+/g, "");
 const RESEND_API_KEY = cleanEnv("RESEND_API_KEY");
