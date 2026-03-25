@@ -45,7 +45,7 @@ const RESEND_API_KEY = cleanEnv("RESEND_API_KEY");
 const RESEND_FROM = cleanEnv("RESEND_FROM") || "onboarding@resend.dev";
 const RESEND_FROM_DOMAIN = RESEND_FROM.split("@")[1]?.toLowerCase() || "";
 const UPLOAD_DIR = process.env.UPLOAD_DIR || "./uploads";
-const EMAIL_TIMEOUT_MS = Number(process.env.EMAIL_TIMEOUT_MS || 60000);
+const EMAIL_TIMEOUT_MS = Number(process.env.EMAIL_TIMEOUT_MS || 15000);
 
 const serviceLabels: Record<string, string> = {
   tree_removal: "Tree Removal",

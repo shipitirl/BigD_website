@@ -325,9 +325,11 @@
           btn.disabled = true;
           msg.textContent = 'Sending...';
           const fd = new FormData(form);
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 20000);
           try {
             const API_BASE = (window.ENV && (window.ENV.BACKEND_URL || window.ENV.API_BASE)) || 'https://bigd-backend.vercel.app';
-            const res = await fetch(`${API_BASE}/api/quote`, { method:'POST', body: fd });
+            const res = await fetch(`${API_BASE}/api/quote`, { method:'POST', body: fd, signal: controller.signal });
             const data = await res.json().catch(() => ({}));
             if(!res.ok || data.emailSent === false) {
               throw new Error(data?.error || 'Request failed');
@@ -335,8 +337,11 @@
             form.reset();
             msg.textContent = '✅ Request sent. We will reach out shortly.';
           } catch (err) {
-            msg.textContent = '❌ Could not send. Please call (262) 215-0497.';
+            msg.textContent = err && err.name === 'AbortError'
+              ? '❌ Request timed out. Please call (262) 215-0497.'
+              : '❌ Could not send. Please call (262) 215-0497.';
           } finally {
+            clearTimeout(timeout);
             btn.disabled = false;
           }
         });
