@@ -43,6 +43,7 @@ const GMAIL_USER = cleanEnv("GMAIL_USER");
 const GMAIL_APP_PASSWORD = cleanEnv("GMAIL_APP_PASSWORD").replace(/\s+/g, "");
 const RESEND_API_KEY = cleanEnv("RESEND_API_KEY");
 const RESEND_FROM = cleanEnv("RESEND_FROM") || "onboarding@resend.dev";
+const RESEND_FROM_DOMAIN = RESEND_FROM.split("@")[1]?.toLowerCase() || "";
 const UPLOAD_DIR = process.env.UPLOAD_DIR || "./uploads";
 const EMAIL_TIMEOUT_MS = Number(process.env.EMAIL_TIMEOUT_MS || 60000);
 
@@ -79,6 +80,26 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): 
   });
 }
 
+function canUseResendForRecipients(to: string[]): { ok: boolean; reason?: string } {
+  if (!RESEND_API_KEY) return { ok: false, reason: "RESEND_API_KEY missing" };
+
+  const normalizedRecipients = to.map((email) => email.trim().toLowerCase()).filter(Boolean);
+  const gmailSender = GMAIL_USER.trim().toLowerCase();
+  const usingSandboxFrom = !RESEND_FROM_DOMAIN || RESEND_FROM_DOMAIN === "resend.dev";
+
+  if (usingSandboxFrom) {
+    const hasNonSenderRecipient = normalizedRecipients.some((email) => email !== gmailSender);
+    if (hasNonSenderRecipient) {
+      return {
+        ok: false,
+        reason: `RESEND_FROM=${RESEND_FROM} is sandbox/test sender and cannot deliver to non-owner recipients`,
+      };
+    }
+  }
+
+  return { ok: true };
+}
+
 async function sendQuoteEmail(
   to: string[],
   subject: string,
@@ -86,8 +107,9 @@ async function sendQuoteEmail(
   html: string,
   attachments: EmailAttachment[]
 ): Promise<boolean> {
-  // Prefer Resend on cloud deployments
-  if (RESEND_API_KEY) {
+  // Prefer Resend on cloud deployments, but skip known sandbox-invalid recipient combinations.
+  const resendAvailability = canUseResendForRecipients(to);
+  if (resendAvailability.ok) {
     try {
       const res = await withTimeout(
         fetch("https://api.resend.com/emails", {
@@ -116,7 +138,7 @@ async function sendQuoteEmail(
       );
 
       if (res.ok) {
-        console.log("[Quote] Email sent via Resend");
+        console.log(`[Quote] Email sent via Resend to ${to.join(", ")}`);
         return true;
       }
       const body = await res.text();
@@ -126,11 +148,15 @@ async function sendQuoteEmail(
     }
 
     console.warn("[Quote] Falling back to Gmail SMTP after Resend failure");
+  } else if (RESEND_API_KEY) {
+    console.warn(`[Quote] Skipping Resend: ${resendAvailability.reason}`);
   }
 
   // Gmail SMTP fallback
   if (!GMAIL_USER || !GMAIL_APP_PASSWORD) {
-    console.warn("[Quote] Email skipped: no working provider config");
+    console.warn(
+      `[Quote] Email skipped: no working provider config (GMAIL_USER=${Boolean(GMAIL_USER)}, GMAIL_APP_PASSWORD=${Boolean(GMAIL_APP_PASSWORD)}, RESEND_API_KEY=${Boolean(RESEND_API_KEY)}, RESEND_FROM=${RESEND_FROM})`
+    );
     return false;
   }
 
