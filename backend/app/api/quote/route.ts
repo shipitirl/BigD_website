@@ -64,6 +64,21 @@ const CORS_HEADERS = {
 
 type EmailAttachment = { filename: string; path: string; contentType?: string; contentBase64?: string };
 
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(`${label} timeout after ${timeoutMs}ms`)), timeoutMs);
+    promise
+      .then((v) => {
+        clearTimeout(t);
+        resolve(v);
+      })
+      .catch((e) => {
+        clearTimeout(t);
+        reject(e);
+      });
+  });
+}
+
 async function sendQuoteEmail(
   to: string[],
   subject: string,
@@ -74,7 +89,7 @@ async function sendQuoteEmail(
   // Prefer Resend on cloud deployments
   if (RESEND_API_KEY) {
     try {
-      const res = await Promise.race([
+      const res = await withTimeout(
         fetch("https://api.resend.com/emails", {
           method: "POST",
           headers: {
@@ -96,20 +111,21 @@ async function sendQuoteEmail(
               })),
           }),
         }),
-        new Promise<Response>((_, reject) =>
-          setTimeout(() => reject(new Error(`Resend timeout after ${EMAIL_TIMEOUT_MS}ms`)), EMAIL_TIMEOUT_MS)
-        ),
-      ]);
+        EMAIL_TIMEOUT_MS,
+        "resend api"
+      );
 
-      if ((res as Response).ok) {
+      if (res.ok) {
         console.log("[Quote] Email sent via Resend");
         return true;
       }
-      const body = await (res as Response).text();
-      console.error(`[Quote] Resend failed: ${(res as Response).status} ${body}`);
+      const body = await res.text();
+      console.error(`[Quote] Resend failed: ${res.status} ${body}`);
     } catch (err) {
       console.error("[Quote] Resend request error:", err);
     }
+
+    console.warn("[Quote] Falling back to Gmail SMTP after Resend failure");
   }
 
   // Gmail SMTP fallback
@@ -118,32 +134,65 @@ async function sendQuoteEmail(
     return false;
   }
 
-  try {
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: GMAIL_USER,
-        pass: GMAIL_APP_PASSWORD,
-      },
-      connectionTimeout: EMAIL_TIMEOUT_MS,
-      greetingTimeout: EMAIL_TIMEOUT_MS,
-      socketTimeout: EMAIL_TIMEOUT_MS,
-    });
+  const mailPayload = {
+    from: `"Big D's Tree Service" <${GMAIL_USER}>`,
+    to,
+    subject,
+    text,
+    html,
+    attachments: attachments.map((a) => ({ filename: a.filename, path: a.path })),
+  };
 
-    await transporter.sendMail({
-      from: `"Big D's Tree Service" <${GMAIL_USER}>`,
-      to,
-      subject,
-      text,
-      html,
-      attachments: attachments.map((a) => ({ filename: a.filename, path: a.path })),
-    });
-    console.log("[Quote] Email sent via Gmail fallback");
-    return true;
-  } catch (err) {
-    console.error("[Quote] Gmail fallback failed:", err);
-    return false;
+  const attempts: Array<{ name: string; transport: any }> = [
+    {
+      name: "gmail-service-465",
+      transport: {
+        service: "gmail",
+        auth: {
+          user: GMAIL_USER,
+          pass: GMAIL_APP_PASSWORD,
+        },
+        connectionTimeout: EMAIL_TIMEOUT_MS,
+        greetingTimeout: EMAIL_TIMEOUT_MS,
+        socketTimeout: EMAIL_TIMEOUT_MS,
+      },
+    },
+    {
+      name: "smtp-587-starttls",
+      transport: {
+        host: "smtp.gmail.com",
+        port: 587,
+        secure: false,
+        requireTLS: true,
+        auth: {
+          user: GMAIL_USER,
+          pass: GMAIL_APP_PASSWORD,
+        },
+        connectionTimeout: EMAIL_TIMEOUT_MS,
+        greetingTimeout: EMAIL_TIMEOUT_MS,
+        socketTimeout: EMAIL_TIMEOUT_MS,
+        tls: { servername: "smtp.gmail.com" },
+      },
+    },
+  ];
+
+  for (const attempt of attempts) {
+    try {
+      console.log(`[Quote] Attempt ${attempt.name} start`);
+      const transporter = nodemailer.createTransport(attempt.transport as any);
+      await withTimeout(
+        transporter.sendMail(mailPayload as any),
+        EMAIL_TIMEOUT_MS,
+        `quote email send (${attempt.name})`
+      );
+      console.log(`[Quote] Email sent via ${attempt.name}`);
+      return true;
+    } catch (err) {
+      console.error(`[Quote] Attempt ${attempt.name} failed:`, err);
+    }
   }
+
+  return false;
 }
 
 export async function POST(request: NextRequest) {
