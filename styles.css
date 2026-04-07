@@ -79,15 +79,14 @@ a {
 
 /* Hero Section */
 .hero {
-    height: 62dvh;
-    min-height: 420px;
+    min-height: clamp(680px, 78dvh, 880px);
     width: 100%;
     position: relative;
     overflow: hidden;
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     justify-content: center;
-    padding-bottom: 1rem;
+    padding: 3.5rem 1rem;
 }
 
 .hero-bg {
@@ -131,8 +130,29 @@ a {
     position: relative;
     z-index: 2;
     text-align: center;
-    max-width: 800px;
+    max-width: 860px;
     padding: 2rem;
+}
+
+.hero-logo-card {
+    width: min(100%, 360px);
+    margin: 0 auto 1.75rem;
+    padding: 0.75rem;
+    background: rgba(16, 20, 28, 0.76);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 28px;
+    box-shadow: 0 22px 60px rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    opacity: 0;
+    animation: fadeUp 1s ease-out 0.15s forwards;
+}
+
+.hero-logo {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 22px;
 }
 
 .hero-title {
@@ -543,6 +563,22 @@ a {
 
 /* Responsive */
 @media (max-width: 768px) {
+    .hero {
+        min-height: 740px;
+        padding: 2.25rem 0.75rem;
+    }
+
+    .hero-content {
+        padding: 1.25rem;
+    }
+
+    .hero-logo-card {
+        width: min(100%, 310px);
+        margin-bottom: 1.25rem;
+        padding: 0.5rem;
+        border-radius: 22px;
+    }
+
     .hero-title {
         font-size: 2.5rem;
     }
