@@ -19,13 +19,65 @@
         body { font-family: 'Inter', sans-serif; background: #f8f9fa; color: #333; line-height: 1.6; }
         
         /* Header */
-        .site-header { background: linear-gradient(135deg, #0b2a4d 0%, #1e3a5f 50%, #c53030 150%); padding: 1rem 0; position: sticky; top: 0; z-index: 100; }
-        .header-content { max-width: 1100px; margin: 0 auto; padding: 0 1rem; display: flex; justify-content: space-between; align-items: center; }
-        .logo { font-family: 'Outfit', sans-serif; font-size: 1.5rem; font-weight: 700; color: #fff; text-decoration: none; }
-        .logo span { color: #ff6b6b; }
-        .nav { display: flex; gap: 1.5rem; flex-wrap: wrap; }
-        .nav a { color: rgba(255,255,255,0.9); text-decoration: none; font-weight: 600; transition: color 0.2s; }
-        .nav a:hover { color: #fff; }
+        .site-hero-bar {
+            position: sticky;
+            top: 0.6rem;
+            z-index: 100;
+            max-width: 1140px;
+            margin: 0.35rem auto 0;
+            padding: 1.1rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+            background: linear-gradient(135deg, #0b2a4d, #1f5b9c 55%, #c53030 130%);
+            color: #fff;
+            border-radius: 18px;
+            border: 1px solid rgba(255,255,255,0.18);
+            box-shadow: 0 14px 30px rgba(0,0,0,0.30);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+        }
+        .hero-bar-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.9rem;
+        }
+        .site-hero-brand-link {
+            color: #fff;
+            text-decoration: none;
+        }
+        .hero-bar-logo {
+            display: block;
+            width: 86px;
+            height: 86px;
+            object-fit: cover;
+            border-radius: 18px;
+            box-shadow: 0 14px 24px rgba(0,0,0,0.28);
+        }
+        .site-hero-brand-text {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.15rem;
+            font-weight: 700;
+            letter-spacing: 0.2px;
+        }
+        .site-hero-nav {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            justify-content: flex-end;
+            flex-wrap: wrap;
+            font-size: 1rem;
+        }
+        .site-hero-nav a {
+            color: #fff;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .site-hero-phone {
+            font-weight: 700;
+        }
         
         /* Hero */
         .hero { background: linear-gradient(135deg, #0b2a4d 0%, #1e3a5f 60%, #c53030 130%); color: #fff; padding: 3rem 1rem; text-align: center; }
@@ -126,23 +178,39 @@
         .footer a { color: #4a7c23; }
         
         @media (max-width: 768px) {
-            .nav { display: none; }
+            .site-hero-bar {
+                top: 0.35rem;
+                margin-top: 0.25rem;
+                padding: 0.9rem 1rem;
+            }
+            .hero-bar-brand { gap: 0.65rem; }
+            .hero-bar-logo {
+                width: 68px;
+                height: 68px;
+                border-radius: 14px;
+            }
+            .site-hero-brand-text { font-size: 1rem; }
+            .site-hero-nav { gap: 0.75rem; font-size: 0.95rem; }
             .hero h1 { font-size: 1.8rem; }
             .gallery-grid { grid-template-columns: repeat(2, 1fr); gap: 0.5rem; }
         }
     </style>
 </head>
 <body>
-    <header class="site-header">
-        <div class="header-content">
-            <a href="/" class="logo">Big D's <span>Tree Service</span></a>
-            <nav class="nav">
-                <a href="/">Home</a>
+    <header class="site-hero-bar">
+            <a href="index.html" class="hero-bar-brand site-hero-brand-link" aria-label="Big D's Tree Service homepage">
+                <img src="assets/images/logo-chainsaw.png"
+                    alt="Big D's Tree Service logo with a chainsaw resting on a tree stump"
+                    class="hero-bar-logo" width="1024" height="1024">
+                <span class="site-hero-brand-text">Big D’s Tree Service</span>
+            </a>
+            <nav aria-label="Primary" class="site-hero-nav">
+                <a href="index.html">Home</a>
                 <a href="services.html">Services</a>
                 <a href="quote.html">Get Quote</a>
                 <a href="gallery.html">Gallery</a>
+                <a href="tel:2622150497" class="site-hero-phone">(262) 215-0497</a>
             </nav>
-        </div>
     </header>
 
     <section class="hero">
